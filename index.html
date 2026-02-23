@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scratcher Shop Sim</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
+        canvas { display: block; background: #f0f0f0; margin: 0 auto; cursor: crosshair; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #ui { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; }
+        .stat-card { background: rgba(0,0,0,0.8); color: #00ff00; padding: 10px 15px; border-radius: 5px; font-weight: bold; pointer-events: auto; }
+        #controls-hint { position: absolute; bottom: 10px; left: 10px; color: #888; font-size: 12px; }
+        .btn { background: #444; color: white; border: none; padding: 8px; cursor: pointer; border-radius: 4px; pointer-events: auto; }
+        .btn:hover { background: #666; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div class="stat-card">
+        Cash: $<span id="moneyDisplay">0</span><br>
+        Loan: $<span id="loanDisplay">0</span>
+    </div>
+    <div class="stat-card">
+        Inventory: <span id="invDisplay">0</span><br>
+        Holding: <span id="heldDisplay">Nothing</span>
+    </div>
+    <div>
+        <button class="btn" onclick="saveGame()">SAVE GAME</button>
+        <button class="btn" onclick="resetGame()" style="background:#822;">RESET</button>
+    </div>
+</div>
+
+<div id="controls-hint">WASD to Move | Click/Tap to Navigate | 'E' to Interact</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- Game Constants & State ---
+let gameState = {
+    money: 500,
+    loan: 5000,
+    shelfStock: 0,
+    player: {
+        x: 400, y: 300,
+        targetX: 400, targetY: 300,
+        isMovingToClick: false,
+        size: 20,
+        speed: 4,
+        angle: 0,
+        holding: null
+    }
+};
+
+const keys = {};
+const zones = {
+    delivery: { x: 50, y: 50, w: 80, h: 80, color: '#8b4513', label: 'DELIVERY' },
+    shelf: { x: 600, y: 150, w: 40, h: 200, color: '#555', label: 'SHELF' },
+    counter: { x: 300, y: 450, w: 200, h: 40, color: '#333', label: 'COUNTER' }
+};
+
+// --- Initialization ---
+function init() {
+    resize();
+    loadGame();
+    window.addEventListener('resize', resize);
+    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+    
+    // Mouse & Touch Support
+    canvas.addEventListener('mousedown', handleInput);
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleInput(e.touches[0]);
+    });
+
+    gameLoop();
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function handleInput(e) {
+    const rect = canvas.getBoundingClientRect();
+    gameState.player.targetX = e.clientX - rect.left;
+    gameState.player.targetY = e.clientY - rect.top;
+    gameState.player.isMovingToClick = true;
+}
+
+// --- Systems: Save/Load ---
+function saveGame() {
+    localStorage.setItem('scratcherStoreSave', JSON.stringify(gameState));
+    alert("Shop Progress Saved!");
+}
+
+function loadGame() {
+    const saved = localStorage.getItem('scratcherStoreSave');
+    if (saved) {
+        gameState = JSON.parse(saved);
+        updateUI();
+    }
+}
+
+function resetGame() {
+    if(confirm("Start a new shop? All progress lost.")) {
+        localStorage.removeItem('scratcherStoreSave');
+        location.reload();
+    }
+}
+
+function updateUI() {
+    document.getElementById('moneyDisplay').innerText = gameState.money;
+    document.getElementById('loanDisplay').innerText = gameState.loan;
+    document.getElementById('invDisplay').innerText = gameState.shelfStock;
+    document.getElementById('heldDisplay').innerText = gameState.player.holding || "Nothing";
+}
+
+// --- Movement & Interaction Logic ---
+function update() {
+    let p = gameState.player;
+    let movedManually = false;
+
+    // Keyboard Movement
+    let vx = 0; let vy = 0;
+    if (keys['w'] || keys['arrowup']) { vy = -p.speed; movedManually = true; }
+    if (keys['s'] || keys['arrowdown']) { vy = p.speed; movedManually = true; }
+    if (keys['a'] || keys['arrowleft']) { vx = -p.speed; movedManually = true; }
+    if (keys['d'] || keys['arrowright']) { vx = p.speed; movedManually = true; }
+
+    if (movedManually) {
+        p.x += vx;
+        p.y += vy;
+        p.isMovingToClick = false;
+        p.angle = Math.atan2(vy, vx);
+    } else if (p.isMovingToClick) {
+        let dx = p.targetX - p.x;
+        let dy = p.targetY - p.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 5) {
+            p.x += (dx/dist) * p.speed;
+            p.y += (dy/dist) * p.speed;
+            p.angle = Math.atan2(dy, dx);
+        } else {
+            p.isMovingToClick = false;
+        }
+    }
+
+    // Interaction (E Key or Auto-Check when near)
+    if (keys['e']) {
+        checkInteractions();
+        keys['e'] = false; // Debounce
+    }
+}
+
+function checkInteractions() {
+    let p = gameState.player;
+    
+    // Near Delivery?
+    if (isNear(p, zones.delivery)) {
+        if (!p.holding && gameState.money >= 50) {
+            gameState.money -= 50;
+            p.holding = "Box of Scratchers";
+        }
+    }
+    // Near Shelf?
+    if (isNear(p, zones.shelf)) {
+        if (p.holding === "Box of Scratchers") {
+            gameState.shelfStock += 20;
+            p.holding = null;
+        }
+    }
+    updateUI();
+}
+
+function isNear(p, zone) {
+    return p.x > zone.x - 20 && p.x < zone.x + zone.w + 20 &&
+           p.y > zone.y - 20 && p.y < zone.y + zone.h + 20;
+}
+
+// --- Rendering ---
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Zones
+    for (let key in zones) {
+        let z = zones[key];
+        ctx.fillStyle = z.color;
+        ctx.fillRect(z.x, z.y, z.w, z.h);
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.font = "bold 12px Arial";
+        ctx.fillText(z.label, z.x, z.y - 5);
+        
+        // Special info for shelf
+        if(key === 'shelf') {
+            ctx.fillStyle = "white";
+            ctx.fillText(`QTY: ${gameState.shelfStock}`, z.x + 5, z.y + 20);
+        }
+    }
+
+    // Draw Player
+    ctx.save();
+    ctx.translate(gameState.player.x, gameState.player.y);
+    ctx.rotate(gameState.player.angle);
+    
+    // Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath(); ctx.arc(2, 2, gameState.player.size, 0, Math.PI*2); ctx.fill();
+    
+    // Body
+    ctx.fillStyle = gameState.player.holding ? "#4CAF50" : "#2196F3";
+    ctx.beginPath(); ctx.arc(0, 0, gameState.player.size, 0, Math.PI*2); ctx.fill();
+    
+    // Direction Indicator (The "Nose")
+    ctx.fillStyle = "white";
+    ctx.beginPath(); ctx.arc(12, 0, 5, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+init();
+</script>
+</body>
+</html>
