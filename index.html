@@ -13,17 +13,16 @@
     font-family: 'Segoe UI', sans-serif; 
     touch-action: none; 
     display: flex; 
-    flex-direction: column; /* Stack top-bar, game, and bottom-bar */
-    height: 100vh; 
+    flex-direction: column; 
+    height: 100dvh; /* Use dynamic viewport height for mobile browsers */
 }
 #gameCanvas { 
     display: block; 
     background: #1a1a1a; 
-    box-shadow: 0 0 50px rgba(0,0,0,0.5); 
-    max-width: 100%; /* Ensure it doesn't wider than the phone */
-    max-height: calc(100vh - 120px); /* Leave room for top and bottom bars */
-    object-fit: contain; /* Keep the aspect ratio correct */
-    margin: auto;
+    max-width: 100%; 
+    max-height: 100%; 
+    object-fit: contain; /* Ensures the aspect ratio is maintained */
+    margin: auto; 
 }
         #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
         #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
@@ -374,7 +373,23 @@ function loop(timestamp) {
 setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
 function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
 function loadGame() { const saved = localStorage.getItem('scratcherSimData'); if (saved) { const loaded = JSON.parse(saved); gameState.money = loaded.money ?? 500; if (loaded.counter) gameState.counter = loaded.counter; if (loaded.shelves) gameState.shelves = loaded.shelves; if (loaded.deliveries) gameState.deliveries = loaded.deliveries; } }
-function resize() { canvas.width = Math.min(window.innerWidth, 800); canvas.height = window.innerHeight; offX = (canvas.width - (COLS * TILE)) / 2; offY = (canvas.height - (ROWS * TILE)) / 2 + 50; gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; gameState.player.tX = gameState.player.x; gameState.player.tY = gameState.player.y; }
+function resize() {
+    // Internal resolution - game logic will always think it's this size
+    canvas.width = 800; 
+    canvas.height = 700; 
+
+    // Recalculate offsets to center the shop grid within the 800x700 space
+    offX = (canvas.width - (COLS * TILE)) / 2;
+    offY = (canvas.height - (ROWS * TILE)) / 2;
+
+    // Reset player position if they are out of bounds after a resize
+    if (gameState.player.x === 0) {
+        gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE;
+        gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE;
+        gameState.player.tX = gameState.player.x;
+        gameState.player.tY = gameState.player.y;
+    }
+}
 function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
 function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX = gameState.tempPos.gX; gameState.movingObj.gridY = gameState.tempPos.gY; } clearBuildState(); saveGame(); }
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
