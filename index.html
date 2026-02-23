@@ -6,7 +6,25 @@
     <title>Scratcher Sim</title>
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
-        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        body { 
+    margin: 0; 
+    overflow: hidden; 
+    background: #111; 
+    font-family: 'Segoe UI', sans-serif; 
+    touch-action: none; 
+    display: flex; 
+    flex-direction: column; /* Stack top-bar, game, and bottom-bar */
+    height: 100vh; 
+}
+#gameCanvas { 
+    display: block; 
+    background: #1a1a1a; 
+    box-shadow: 0 0 50px rgba(0,0,0,0.5); 
+    max-width: 100%; /* Ensure it doesn't wider than the phone */
+    max-height: calc(100vh - 120px); /* Leave room for top and bottom bars */
+    object-fit: contain; /* Keep the aspect ratio correct */
+    margin: auto;
+}
         #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
         #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
         #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
@@ -242,12 +260,25 @@ function draw() {
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
 
     gameState.deliveries.forEach(d => {
-        ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
-        ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
-        
-        // ctx.strokeStyle = Math.hypot(p.x - d.x, p.y - d.y) < 50 ? "lime" : "rgba(255,255,255,0.2)";
-        // ctx.beginPath(); ctx.arc(d.x, d.y, 25, 0, Math.PI*2); ctx.stroke();
-    });
+    // 1. Draw the box base
+    ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
+    ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
+    
+    // 2. Draw the proximity indicator circle
+    // ctx.strokeStyle = Math.hypot(p.x - d.x, p.y - d.y) < 50 ? "lime" : "rgba(255,255,255,0.2)";
+    // ctx.beginPath(); ctx.arc(d.x, d.y, 25, 0, Math.PI * 2); ctx.stroke();
+
+    // 3. NEW: Draw the quantity overlay
+    ctx.fillStyle = "white";
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    // Draw text slightly above the box so it doesn't get covered by the player
+    ctx.fillText(d.qty, d.x, d.y + 4); 
+    ctx.fillStyle = "black";
+    ctx.fillText(d.qty, d.x + 1, d.y + 5); // Shadow
+    ctx.fillStyle = "white";
+    ctx.fillText(d.qty, d.x, d.y + 4);     // Main text
+});
 
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return;
@@ -282,11 +313,22 @@ function draw() {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);
-    // Draw box 20 pixels in front of the player center
+    
+    // Draw the box in front of the player
     ctx.fillStyle = "#d2b48c"; 
     ctx.fillRect(10, -8, 16, 16); 
     ctx.strokeStyle = "#8b4513";
     ctx.strokeRect(10, -8, 16, 16);
+    
+    // NEW: Draw the quantity number on the held box
+    ctx.fillStyle = "white";
+    ctx.font = "bold 9px Arial";
+    ctx.textAlign = "center";
+    // We rotate the text back so it stays upright regardless of player direction
+    ctx.rotate(-p.angle); 
+    // Position adjusted to stay centered on the box relative to player offset
+    ctx.fillText(p.holding, 18 * Math.cos(p.angle), 18 * Math.sin(p.angle) + 4);
+    
     ctx.restore();
 }
 
@@ -343,22 +385,27 @@ function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scra
 canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
 canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    
+    // Calculate the scale between the CSS size and the internal canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Apply the scale to the mouse coordinates
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    
     const gX = Math.floor((mx - offX) / TILE);
     const gY = Math.floor((my - offY) / TILE);
-    
-    const p = gameState.player; // Fixes the 'p is not defined' error
+    const p = gameState.player;
 
-    // 1. DROP BOX LOGIC (Right-Click only)
     if (e.button === 2) { 
-    triggerAction(); // Use the shared function for Right-Click
-    return;
-}
+        triggerAction(); 
+        return;
+    }
 
-    // 2. MOVEMENT & BUILD LOGIC (Left-Click only)
     if (e.button === 0) {
         if (gameState.mode === 'BUILD') {
+            // Build logic remains the same, but uses corrected mx/my
             if (!gameState.movingObj) {
                 if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) gameState.movingObj = gameState.counter;
                 gameState.shelves.forEach(s => { if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s; });
@@ -366,11 +413,12 @@ canvas.addEventListener('mousedown', (e) => {
                 if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
                     gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
                     const ui = document.getElementById('build-confirm');
-                    ui.style.display = 'flex'; ui.style.left = (rect.left + offX + gX * TILE) + 'px'; ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
+                    ui.style.display = 'flex'; 
+                    ui.style.left = (e.clientX) + 'px'; // UI follows raw mouse
+                    ui.style.top = (e.clientY - 50) + 'px';
                 }
             }
         } else { 
-            // Now movement works even if holding a box!
             p.tX = mx; 
             p.tY = my; 
         }
@@ -417,16 +465,19 @@ canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const mx = touch.clientX - rect.left;
-    const my = touch.clientY - rect.top;
+    const p = gameState.player;
+    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mx = (touch.clientX - rect.left) * scaleX;
+    const my = (touch.clientY - rect.top) * scaleY;
 
     if (e.touches.length > 1) {
-        // Two-finger tap triggers the action (like a right-click)
         triggerAction();
     } else {
-        // Single tap moves the player
-        gameState.player.tX = mx;
-        gameState.player.tY = my;
+        p.tX = mx;
+        p.tY = my;
     }
 }, { passive: false });
 </script>
