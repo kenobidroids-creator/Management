@@ -13,7 +13,7 @@ body {
     display: flex; flex-direction: column; height: 100dvh; /* Use dynamic viewport height for mobile browsers */
 }
 
-#gameCanvas { display: block; background: #1a1a1a; max-width: 100%; max-height: 100%; object-fit: contain; /* Ensures the aspect ratio is maintained */ margin: auto; }
+#gameCanvas { flex: 1; display: block; background: #1a1a1a; max-width: 100%; max-height: 100%; object-fit: contain; /* Ensures the aspect ratio is maintained */ margin: auto; }
 
 /* DESKTOP LAYOUT (Horizontal) */
 @media (orientation: landscape) {
@@ -27,7 +27,7 @@ body {
 /* MOBILE LAYOUT (Vertical) */
 @media (orientation: portrait) {
     #top-bar { position: relative; flex-shrink: 0; height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; }
-    #bottom-bar { position: relative; flex-shrink: 0; height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: 15px; }
+    #bottom-bar { position: relative; flex-shrink: 0; height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); }
     .btn-action { 
         display: flex; /* or block */
         background: #ff9800; 
@@ -430,21 +430,21 @@ function loadGame() {
 function resize() {
     const isPortrait = window.innerHeight > window.innerWidth;
     
-    // 1. Desktop stays at a max-width, Mobile fills the screen
-    canvas.width = isPortrait ? window.innerWidth : Math.min(window.innerWidth, 800);
+    // Get the exact dimensions of the middle space
+    const rect = canvas.parentNode.getBoundingClientRect();
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 130; // 50px top + 80px bottom
+
+    // Recalculate TILE based on the actual width
+    const currentTile = isPortrait ? Math.floor(canvas.width / (COLS + 0.5)) : 40;
     
-    // 2. iOS FIX: Use innerHeight but SUBTRACT the heights of your bars
-    // Top bar is 50px, Bottom bar is 70px
-    canvas.height = window.innerHeight - 120; 
+    offX = (canvas.width - (COLS * currentTile)) / 2;
+    // Position the shop logic relative to the top of the canvas
+    offY = isPortrait ? 120 : (canvas.height - (ROWS * currentTile)) / 2;
 
-    // 3. Center the shop horizontally and vertically
-    offX = (canvas.width - (COLS * TILE)) / 2;
-    offY = (canvas.height - (ROWS * TILE)) / 2 + 30;
-
-    // Move player to start position if just loading
     if (gameState.player.x === 0) {
-        gameState.player.x = offX + (COLS / 2) * TILE;
-        gameState.player.y = offY + (ROWS / 2) * TILE;
+        gameState.player.x = offX + (COLS / 2) * currentTile;
+        gameState.player.y = offY + (ROWS / 2) * currentTile;
         gameState.player.tX = gameState.player.x;
         gameState.player.tY = gameState.player.y;
     }
