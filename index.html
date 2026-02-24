@@ -6,24 +6,7 @@
     <title>Scratcher Sim</title>
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
-        body { 
-    margin: 0; 
-    overflow: hidden; 
-    background: #111; 
-    font-family: 'Segoe UI', sans-serif; 
-    touch-action: none; 
-    display: flex; 
-    flex-direction: column; 
-    height: 100dvh; /* Use dynamic viewport height for mobile browsers */
-}
-#gameCanvas { 
-    display: block; 
-    background: #1a1a1a; 
-    max-width: 100%; 
-    max-height: 100%; 
-    object-fit: contain; /* Ensures the aspect ratio is maintained */
-    margin: auto; 
-}
+        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; }
         #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
         #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
         #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
@@ -73,9 +56,10 @@ const ctx = canvas.getContext('2d');
 
 window.oncontextmenu = (e) => e.preventDefault();
 
-let TILE = 40;
-const COLS = 15;
-const ROWS = 12;
+const isMobileLayout = window.innerHeight > window.innerWidth;
+const TILE = isMobileLayout ? Math.floor(window.innerWidth / 10) : 40; // Smaller tiles for mobile
+const COLS = isMobileLayout ? 9 : 15;  // Narrower for the "long" look
+const ROWS = isMobileLayout ? 18 : 12; // Much taller
 let offX = 0, offY = 0;
 
 let lastTime = 0;
@@ -84,11 +68,7 @@ let restockTimer = 0;
 
 let gameState = {
     money: 500, mode: 'PLAY',
-    player: { 
-    x: -100, y: -100, // Start off-screen; resize/load will place correctly
-    tX: 0, tY: 0, 
-    size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 
-},
+    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
     counter: { gridX: 2, gridY: 5, w: 1, h: 3, type: 'counter' },
     shelves: [{ gridX: 13, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [],
@@ -100,23 +80,32 @@ function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY
 function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
 
 function checkCollision(nx, ny, isAI = false) {
+    // 1. Define the Door Area dynamically based on the centered shop
     const doorMinX = offX + TILE * 1;
     const doorMaxX = offX + TILE * 4;
-    // Allow passage through the door area at the top wall
-    const isAtDoor = (nx > doorMinX && nx < doorMaxX && ny < offY + 10 && ny > offY - 20);
+    const isAtDoor = (nx > doorMinX && nx < doorMaxX && ny < offY + 20 && ny > offY - 20);
 
-    if (isAtDoor) return false;
+    // 2. Allow movement on the sidewalk
+    const upperLimit = isMobileLayout ? offY - 200 : offY - 80; 
+    if (!isAI && ny < offY) {
+        if (nx < 10 || nx > canvas.width - 10 || ny < upperLimit) return true;
+        return false; 
+    }
 
-    // Hard wall boundaries based on current offX/offY
-    if (nx < offX + 10 || nx > offX + (COLS * TILE) - 10 || ny < offY + 10 || ny > offY + (ROWS * TILE) - 10) {
-        return true; 
+    // 3. Shop Wall Collision (Skip if at the door)
+    if (!isAtDoor) {
+        if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || ny < offY + 15 || ny > offY + (ROWS * TILE) - 15) {
+            // AI can be outside (ny < offY), but if they are inside, they hit the walls
+            if (!isAI || ny > offY) return true;
+        }
     }
     
-    // Furniture collision
+    // 4. Furniture Collision
     let collision = false;
     [gameState.counter, ...gameState.shelves].forEach(obj => {
+        if (gameState.movingObj === obj) return; 
         const r = getRect(obj);
-        if (nx + 10 > r.x && nx - 10 < r.x + r.w && ny + 10 > r.y && ny - 10 < r.y + r.h) collision = true;
+        if (nx + 12 > r.x && nx - 12 < r.x + r.w && ny + 12 > r.y && ny - 12 < r.y + r.h) collision = true;
     });
     return collision;
 }
@@ -124,32 +113,23 @@ function checkCollision(nx, ny, isAI = false) {
 function buyStock() {
     if (gameState.money >= 50) {
         gameState.money -= 50;
-        // Spawn relative to the current shop grid
-        gameState.deliveries.push({ 
-            x: offX + TILE * (1.5 + Math.random() * 2), 
-            y: offY - 40, 
-            qty: 50 
-        });
+        // Drop box in front of the shop doorway
+        gameState.deliveries.push({ x: offX + TILE * (1.5 + Math.random() * 2), y: offY - 80, qty: 50 });
         saveGame();
     }
 }
 
 function spawnCustomer() {
     if (gameState.mode !== 'PLAY') return;
-    // Spawn off-screen relative to the current width
     const side = Math.random() > 0.5 ? -150 : canvas.width + 150;
     
-    // NEW: Target the door relative to offX
-    const doorX = offX + TILE * 2.5; 
-    
+    // Target the centered door
+    const doorX = offX + (TILE * 2.5);
+    const spawnY = offY - (isMobileLayout ? 120 : 60);
+
     gameState.customers.push({
-        id: Math.random(), 
-        x: side, 
-        y: offY - 100, // Spawn above the sidewalk
-        tX: doorX, 
-        tY: offY - 100, // Walk to the door position outside
-        speed: 80 + Math.random() * 40, 
-        state: 'WALKING', 
+        id: Math.random(), x: side, y: spawnY, tX: doorX, tY: spawnY,
+        speed: 80 + Math.random() * 40, state: 'WALKING', 
         basket: 0, timer: 0, queueTime: Date.now(),
         color: `hsl(${Math.random() * 360}, 65%, 60%)`
     });
@@ -188,12 +168,8 @@ function updateCustomers(dt) {
 
     gameState.customers.forEach((c, index) => {
         if (c.state === 'WALKING') {
-    // Check if they reached the door x-position
-    if (Math.abs(c.x - c.tX) < 10) { 
-        c.state = 'ENTERING'; 
-        c.tY = offY + TILE * 1.5; // Target a spot INSIDE the shop floor
-    }
-}
+            if (Math.abs(c.x - c.tX) < 10) { c.state = 'ENTERING'; c.tY = offY + TILE * 1.5; }
+        } 
         else if (c.state === 'ENTERING' && Math.abs(c.y - c.tY) < 10) {
             c.state = 'TO_SHELF';
             c.queueTime = Date.now();
@@ -234,9 +210,13 @@ function updateCustomers(dt) {
             c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
         } 
         else if (c.state === 'LEAVING') {
-            if (c.y > offY - 30) { c.tX = offX + TILE * 2.5; c.tY = offY - 60; }
-            else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
-        }
+    // Return to the door relative to the current shop position
+    if (c.y > offY - 30) { 
+        c.tX = offX + (TILE * 2.5); 
+        c.tY = offY - (isMobileLayout ? 120 : 60); 
+    }
+    else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
+}
 
         let dx = c.tX - c.x, dy = c.tY - c.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
@@ -257,12 +237,11 @@ function draw() {
     let p = gameState.player;
     
     // Environment
-    // Road and sidewalk
-    ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - 80); 
-    ctx.fillStyle = "#555"; ctx.fillRect(0, offY - 80, canvas.width, 80); 
+    const sidewalkSize = isMobileLayout ? 180 : 80;
+ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - sidewalkSize); 
+ctx.fillStyle = "#555"; ctx.fillRect(0, offY - sidewalkSize, canvas.width, sidewalkSize);
     ctx.strokeStyle = "#444";
     for(let i=0; i<canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, offY-80); ctx.lineTo(i, offY); ctx.stroke(); }
-        // Floor below
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
     
     if (gameState.mode === 'BUILD') {
@@ -280,24 +259,15 @@ function draw() {
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
 
     gameState.deliveries.forEach(d => {
-    // 1. Draw the box base
+    // Draw the box
     ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
     ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
     
-    // 2. Draw the proximity indicator circle
-    // ctx.strokeStyle = Math.hypot(p.x - d.x, p.y - d.y) < 50 ? "lime" : "rgba(255,255,255,0.2)";
-    // ctx.beginPath(); ctx.arc(d.x, d.y, 25, 0, Math.PI * 2); ctx.stroke();
-
-    // 3. NEW: Draw the quantity overlay
-    ctx.fillStyle = "white";
-    ctx.font = "bold 10px Arial";
+    // NEW: Draw the quantity text overlay
+    ctx.fillStyle = "white"; 
+    ctx.font = "bold 10px Arial"; 
     ctx.textAlign = "center";
-    // Draw text slightly above the box so it doesn't get covered by the player
     ctx.fillText(d.qty, d.x, d.y + 4); 
-    ctx.fillStyle = "black";
-    ctx.fillText(d.qty, d.x + 1, d.y + 5); // Shadow
-    ctx.fillStyle = "white";
-    ctx.fillText(d.qty, d.x, d.y + 4);     // Main text
 });
 
     [gameState.counter, ...gameState.shelves].forEach(obj => {
@@ -334,20 +304,21 @@ function draw() {
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);
     
-    // Draw the box in front of the player
+    // Draw the held box
     ctx.fillStyle = "#d2b48c"; 
     ctx.fillRect(10, -8, 16, 16); 
     ctx.strokeStyle = "#8b4513";
     ctx.strokeRect(10, -8, 16, 16);
     
-    // NEW: Draw the quantity number on the held box
-    ctx.fillStyle = "white";
-    ctx.font = "bold 9px Arial";
-    ctx.textAlign = "center";
-    // We rotate the text back so it stays upright regardless of player direction
+    // Draw the number, but un-rotate it so it stays upright
     ctx.rotate(-p.angle); 
-    // Position adjusted to stay centered on the box relative to player offset
-    ctx.fillText(p.holding, 18 * Math.cos(p.angle), 18 * Math.sin(p.angle) + 4);
+    ctx.fillStyle = "white";
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    // We adjust the X/Y slightly because we are still in the player's translated space
+    const textX = Math.cos(p.angle) * 18;
+    const textY = Math.sin(p.angle) * 18 + 4;
+    ctx.fillText(p.holding, textX, textY);
     
     ctx.restore();
 }
@@ -392,77 +363,31 @@ function loop(timestamp) {
 
 // Utility and Handlers
 setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
-function saveGame() {
-    const savedDeliveries = gameState.deliveries.map(d => ({
-        gridX: (d.x - offX) / TILE,
-        gridY: (d.y - offY) / TILE,
-        qty: d.qty
-    }));
-
-    localStorage.setItem('scratcherSimData', JSON.stringify({
+function saveGame() { 
+    const key = isMobileLayout ? 'scratcherSim_Mobile' : 'scratcherSimData';
+    localStorage.setItem(key, JSON.stringify({
         money: gameState.money, 
         counter: gameState.counter, 
         shelves: gameState.shelves, 
-        deliveries: savedDeliveries,
-        playerGrid: {
-            gx: (gameState.player.x - offX) / TILE,
-            gy: (gameState.player.y - offY) / TILE
-        }
-    }));
+        deliveries: gameState.deliveries
+    })); 
 }
-
-function loadGame() {
-    const saved = localStorage.getItem('scratcherSimData');
-    if (saved) {
-        const loaded = JSON.parse(saved);
-        gameState.money = loaded.money ?? 500;
-        if (loaded.counter) gameState.counter = loaded.counter;
-        if (loaded.shelves) gameState.shelves = loaded.shelves;
-        
-        if (loaded.deliveries) {
-            gameState.deliveries = loaded.deliveries.map(d => ({
-                x: offX + (d.gridX * TILE),
-                y: offY + (d.gridY * TILE),
-                qty: d.qty
-            }));
-        }
-
-        if (loaded.playerGrid) {
-            gameState.player.x = offX + (loaded.playerGrid.gx * TILE);
-            gameState.player.y = offY + (loaded.playerGrid.gy * TILE);
-            gameState.player.tX = gameState.player.x;
-            gameState.player.tY = gameState.player.y;
-        }
+function loadGame() { 
+    const key = isMobileLayout ? 'scratcherSim_Mobile' : 'scratcherSimData';
+    const saved = localStorage.getItem(key); 
+    if (saved) { 
+        const loaded = JSON.parse(saved); 
+        gameState.money = loaded.money ?? 500; 
+        gameState.counter = loaded.counter; 
+        gameState.shelves = loaded.shelves; 
+        gameState.deliveries = loaded.deliveries; 
+    } else if (isMobileLayout) {
+        // Default starter positions for the VERTICAL layout
+        gameState.counter = { gridX: 1, gridY: 10, w: 1, h: 3, type: 'counter' }; 
+        gameState.shelves = [{ gridX: 7, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }];
     }
 }
-
-function resize() {
-    // 1. Calculate TILE size to fit the 15-column room in the window
-    const availableWidth = window.innerWidth - 40; // 40px margin
-    TILE = Math.max(20, Math.min(40, Math.floor(availableWidth / COLS)));
-    
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    // 2. Center the shop grid
-    offX = (canvas.width - (COLS * TILE)) / 2;
-    offY = (canvas.height - (ROWS * TILE)) / 2;
-
-    // 3. SAFE SPAWN: Always place player behind the counter relative to current grid
-    const p = gameState.player;
-    p.x = offX + (gameState.counter.gridX - 0.5) * TILE;
-    p.y = offY + (gameState.counter.gridY + 1.5) * TILE;
-    p.tX = p.x; 
-    p.tY = p.y;
-
-    // 4. Update active customer targets so they find the door
-    gameState.customers.forEach(c => {
-        if (c.state === 'WALKING' || c.state === 'ENTERING') {
-            c.tX = offX + TILE * 2.5; 
-        }
-    });
-}
-
+function resize() { canvas.width = Math.min(window.innerWidth, 800); canvas.height = window.innerHeight; offX = (canvas.width - (COLS * TILE)) / 2; offY = (canvas.height - (ROWS * TILE)) / 2 + 50; gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; gameState.player.tX = gameState.player.x; gameState.player.tY = gameState.player.y; }
 function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
 function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX = gameState.tempPos.gX; gameState.movingObj.gridY = gameState.tempPos.gY; } clearBuildState(); saveGame(); }
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
@@ -473,27 +398,22 @@ function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scra
 canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
 canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    
-    // Calculate the scale between the CSS size and the internal canvas size
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    // Apply the scale to the mouse coordinates
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-    
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
     const gX = Math.floor((mx - offX) / TILE);
     const gY = Math.floor((my - offY) / TILE);
-    const p = gameState.player;
+    
+    const p = gameState.player; // Fixes the 'p is not defined' error
 
+    // 1. DROP BOX LOGIC (Right-Click only)
     if (e.button === 2) { 
-        triggerAction(); 
-        return;
-    }
+    triggerAction(); // Use the shared function for Right-Click
+    return;
+}
 
+    // 2. MOVEMENT & BUILD LOGIC (Left-Click only)
     if (e.button === 0) {
         if (gameState.mode === 'BUILD') {
-            // Build logic remains the same, but uses corrected mx/my
             if (!gameState.movingObj) {
                 if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) gameState.movingObj = gameState.counter;
                 gameState.shelves.forEach(s => { if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s; });
@@ -501,12 +421,11 @@ canvas.addEventListener('mousedown', (e) => {
                 if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
                     gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
                     const ui = document.getElementById('build-confirm');
-                    ui.style.display = 'flex'; 
-                    ui.style.left = (e.clientX) + 'px'; // UI follows raw mouse
-                    ui.style.top = (e.clientY - 50) + 'px';
+                    ui.style.display = 'flex'; ui.style.left = (rect.left + offX + gX * TILE) + 'px'; ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
                 }
             }
         } else { 
+            // Now movement works even if holding a box!
             p.tX = mx; 
             p.tY = my; 
         }
@@ -553,30 +472,18 @@ canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const p = gameState.player;
-    
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const mx = (touch.clientX - rect.left) * scaleX;
-    const my = (touch.clientY - rect.top) * scaleY;
+    const mx = touch.clientX - rect.left;
+    const my = touch.clientY - rect.top;
 
     if (e.touches.length > 1) {
+        // Two-finger tap triggers the action (like a right-click)
         triggerAction();
     } else {
-        p.tX = mx;
-        p.tY = my;
+        // Single tap moves the player
+        gameState.player.tX = mx;
+        gameState.player.tY = my;
     }
 }, { passive: false });
-
-
-// Refresh logic: Only reloads if the width changes (avoids mobile menu bar issues)
-let lastWidth = window.innerWidth;
-window.addEventListener('resize', () => {
-    if (window.innerWidth !== lastWidth) {
-        location.reload(); 
-    }
-});
 </script>
 </body>
 </html>
