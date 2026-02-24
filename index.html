@@ -10,10 +10,10 @@
 body { 
     margin: 0; overflow: hidden; background: #111; 
     font-family: 'Segoe UI', sans-serif; touch-action: none; 
-    display: flex; flex-direction: column; height: 100vh;
+    display: flex; flex-direction: column; height: 100dvh; /* Use dynamic viewport height for mobile browsers */
 }
 
-#gameCanvas { display: block; background: #1a1a1a; margin: auto; }
+#gameCanvas { display: block; background: #1a1a1a; max-width: 100%; max-height: 100%; object-fit: contain; /* Ensures the aspect ratio is maintained */ margin: auto; }
 
 /* DESKTOP LAYOUT (Horizontal) */
 @media (orientation: landscape) {
@@ -262,13 +262,25 @@ function updateCustomers(dt) {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     let p = gameState.player;
+
+    const shopWidth = COLS * TILE; 
+    const sidewalkSize = isMobileLayout ? 180 : 80;
     
     // Environment
-    const sidewalkSize = isMobileLayout ? 180 : 80;
-ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - sidewalkSize); 
-ctx.fillStyle = "#555"; ctx.fillRect(0, offY - sidewalkSize, canvas.width, sidewalkSize);
-    ctx.strokeStyle = "#444";
-    for(let i=0; i<canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, offY-80); ctx.lineTo(i, offY); ctx.stroke(); }
+    ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - sidewalkSize);
+    ctx.fillRect(offX, 0, shopWidth, offY - sidewalkSize); // Road 
+
+    ctx.fillStyle = "#555"; ctx.fillRect(0, offY - sidewalkSize, canvas.width, sidewalkSize);
+    ctx.fillRect(offX, offY - sidewalkSize, shopWidth, sidewalkSize); // Sidewalk
+    
+    // Draw sidewalk lines only within the shop width
+ctx.strokeStyle = "#444";
+for(let i = 0; i <= shopWidth; i += TILE * 2) { 
+    ctx.beginPath(); 
+    ctx.moveTo(offX + i, offY - sidewalkSize); 
+    ctx.lineTo(offX + i, offY); 
+    ctx.stroke(); 
+}
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
     
     if (gameState.mode === 'BUILD') {
@@ -417,20 +429,22 @@ function loadGame() {
 function resize() {
     const isPortrait = window.innerHeight > window.innerWidth;
     
-    // Calculate available height after subtracting bars (only if in portrait)
-    const barHeight = isPortrait ? 160 : 0; 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - barHeight;
+    // Calculate space after subtracting UI bars (50px top + 70px bottom)
+    const availableHeight = window.innerHeight - 120; 
+    const availableWidth = window.innerWidth;
 
-    // Responsive TILE sizing
+    // Set canvas to fill available space exactly
+    canvas.width = availableWidth;
+    canvas.height = availableHeight;
+
+    // Fixed TILE calculation so it fits the narrowest dimension
     const currentTile = isPortrait ? Math.floor(canvas.width / 10) : 40;
     
+    // Center the shop grid
     offX = (canvas.width - (COLS * currentTile)) / 2;
-    
-    // Desktop is centered, Mobile is pushed down for sidewalk room
-    offY = isPortrait ? 140 : (canvas.height - (ROWS * currentTile)) / 2;
+    offY = isPortrait ? 140 : (canvas.height - (ROWS * currentTile)) / 2 + 30;
 
-    // Only reset player if they haven't been placed yet
+    // Place player initially
     if (gameState.player.x === 0) {
         gameState.player.x = offX + (COLS / 2) * currentTile;
         gameState.player.y = offY + (ROWS / 2) * currentTile;
@@ -521,16 +535,22 @@ function triggerAction() {
 // Handle single-touch for movement and multi-touch for action
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect(); // Always get fresh bounds
+    const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const mx = touch.clientX - rect.left;
-    const my = touch.clientY - rect.top;
+    const p = gameState.player;
+    
+    // Account for CSS scaling
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const mx = (touch.clientX - rect.left) * scaleX;
+    const my = (touch.clientY - rect.top) * scaleY;
 
     if (e.touches.length > 1) {
         triggerAction();
     } else {
-        gameState.player.tX = mx;
-        gameState.player.tY = my;
+        p.tX = mx;
+        p.tY = my;
     }
 }, { passive: false });
 </script>
