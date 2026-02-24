@@ -7,48 +7,36 @@
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
 
-body { 
-    margin: 0; overflow: hidden; background: #111; 
-    font-family: 'Segoe UI', sans-serif; touch-action: none; 
-    display: flex; flex-direction: column; height: 100dvh; /* Use dynamic viewport height for mobile browsers */
-}
+        body { 
+            margin: 0; overflow: hidden; background: #111; 
+            font-family: 'Segoe UI', sans-serif; touch-action: none; 
+            display: flex; flex-direction: column; height: 100dvh; 
+        }
 
-#gameCanvas { flex: 1; display: block; background: #1a1a1a; max-width: 100%; max-height: 100%; object-fit: contain; /* Ensures the aspect ratio is maintained */ margin: auto; }
+        #gameCanvas { flex: 1; display: block; background: #1a1a1a; max-width: 100%; max-height: 100%; margin: auto; }
 
-/* DESKTOP LAYOUT (Horizontal) */
-@media (orientation: landscape) {
-    #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 40px; background: rgba(0,0,0,0.7); z-index: 10; display: flex; justify-content: space-around; align-items: center; color: white; }
-    #bottom-bar { position: absolute; bottom: 20px; left: 0; right: 0; height: auto; background: transparent; display: flex; justify-content: center; gap: 15px; z-index: 10; }
-    .btn-action { 
-    display: none; 
-}
-}
+        /* DESKTOP LAYOUT (Horizontal) */
+        @media (orientation: landscape) {
+            #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 40px; background: rgba(0,0,0,0.7); z-index: 10; display: flex; justify-content: space-around; align-items: center; color: white; }
+            #bottom-bar { position: absolute; bottom: 20px; left: 0; right: 0; height: auto; background: transparent; display: flex; justify-content: center; gap: 15px; z-index: 10; }
+            .btn-action { display: none; }
+        }
 
-/* MOBILE LAYOUT (Vertical) */
-@media (orientation: portrait) {
-    #top-bar { position: relative; flex-shrink: 0; height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; }
-    #bottom-bar { position: relative; flex-shrink: 0; height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); }
-    .btn-action { 
-        display: flex; /* or block */
-        background: #ff9800; 
-        border: 2px solid white;
-        padding: 10px 15px;
-        border-radius: 8px;
-        color: white;
-        font-weight: bold;
-        min-width: 80px;
-        justify-content: center;
-        align-items: center;
-    }
-}
+        /* MOBILE LAYOUT (Vertical) */
+        @media (orientation: portrait) {
+            #top-bar { position: relative; flex-shrink: 0; height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; }
+            #bottom-bar { position: relative; flex-shrink: 0; height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); }
+            .btn-action { 
+                display: flex; background: #ff9800; border: 2px solid white; padding: 10px 15px; border-radius: 8px; color: white; font-weight: bold; min-width: 80px; justify-content: center; align-items: center;
+            }
+        }
 
-#build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
+        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
         .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
         .btn-confirm { background: var(--accent); }
         .btn-cancel { background: var(--danger); }
         .btn-build { background: #e91e63; }
         #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
-        canvas { display: block; background: #1a1a1a; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -85,9 +73,9 @@ const ctx = canvas.getContext('2d');
 window.oncontextmenu = (e) => e.preventDefault();
 
 const isMobileLayout = window.innerHeight > window.innerWidth;
-const TILE = isMobileLayout ? Math.floor(window.innerWidth / 10) : 40; // Smaller tiles for mobile
-const COLS = isMobileLayout ? 9 : 15;  // Narrower for the "long" look
-const ROWS = isMobileLayout ? 18 : 12; // Much taller
+let TILE = isMobileLayout ? Math.floor(window.innerWidth / 10) : 40;
+const COLS = isMobileLayout ? 9 : 15;  
+const ROWS = isMobileLayout ? 18 : 12; 
 let offX = 0, offY = 0;
 
 let lastTime = 0;
@@ -97,8 +85,9 @@ let restockTimer = 0;
 let gameState = {
     money: 500, mode: 'PLAY',
     player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
-    counter: { gridX: 2, gridY: 5, w: 1, h: 3, type: 'counter' },
-    shelves: [{ gridX: 13, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
+    // Defaults for Fresh Load
+    counter: { gridX: 2, gridY: 4, w: 1, h: 3, type: 'counter' },
+    shelves: [{ gridX: 6, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [],
     deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
@@ -108,27 +97,22 @@ function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY
 function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
 
 function checkCollision(nx, ny, isAI = false) {
-    // 1. Define the Door Area dynamically based on the centered shop
     const doorMinX = offX + TILE * 1;
     const doorMaxX = offX + TILE * 4;
     const isAtDoor = (nx > doorMinX && nx < doorMaxX && ny < offY + 20 && ny > offY - 20);
 
-    // 2. Allow movement on the sidewalk
     const upperLimit = isMobileLayout ? offY - 200 : offY - 80; 
     if (!isAI && ny < offY) {
         if (nx < 10 || nx > canvas.width - 10 || ny < upperLimit) return true;
         return false; 
     }
 
-    // 3. Shop Wall Collision (Skip if at the door)
     if (!isAtDoor) {
         if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || ny < offY + 15 || ny > offY + (ROWS * TILE) - 15) {
-            // AI can be outside (ny < offY), but if they are inside, they hit the walls
             if (!isAI || ny > offY) return true;
         }
     }
     
-    // 4. Furniture Collision
     let collision = false;
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return; 
@@ -141,7 +125,6 @@ function checkCollision(nx, ny, isAI = false) {
 function buyStock() {
     if (gameState.money >= 50) {
         gameState.money -= 50;
-        // Drop box in front of the shop doorway
         gameState.deliveries.push({ x: offX + TILE * (1.5 + Math.random() * 2), y: offY - 80, qty: 50 });
         saveGame();
     }
@@ -150,8 +133,6 @@ function buyStock() {
 function spawnCustomer() {
     if (gameState.mode !== 'PLAY') return;
     const side = Math.random() > 0.5 ? -150 : canvas.width + 150;
-    
-    // Aim for the door relative to the current center
     const doorX = offX + (TILE * 2.5);
     const streetY = offY - 60; 
 
@@ -162,10 +143,10 @@ function spawnCustomer() {
         color: `hsl(${Math.random() * 360}, 65%, 60%)`
     });
 }
+
 function updateCustomers(dt) {
     if (gameState.mode !== 'PLAY') return;
 
-    // Line management for both shelf and register
     const shelfQueue = gameState.customers
         .filter(c => c.state === 'TO_SHELF' || c.state === 'PICKING')
         .sort((a,b) => a.queueTime - b.queueTime);
@@ -202,20 +183,15 @@ function updateCustomers(dt) {
             c.queueTime = Date.now();
         } 
         else if (c.state === 'TO_SHELF') {
-    const pos = shelfQueue.indexOf(c);
-    const targetShelf = gameState.shelves[0]; // Targets the first shelf
-    
-    // Dynamic standing spot: 1 tile to the left of the shelf, aligned with the top of it
-    // Then adds a 35px gap for each person in line behind the first
-    c.tX = offX + (targetShelf.gridX - 1) * TILE + 20;
-    c.tY = offY + (targetShelf.gridY * TILE) + 20 + (pos * 35);
-    
-    // Only the person at index 0 (front of line) can start picking
-    if (pos === 0 && Math.abs(c.x - c.tX) < 10 && Math.abs(c.y - c.tY) < 10) {
-        c.state = 'PICKING'; 
-        c.timer = 1.0 + Math.random();
-    }
-} 
+            const pos = shelfQueue.indexOf(c);
+            const targetShelf = gameState.shelves[0];
+            c.tX = offX + (targetShelf.gridX - 1) * TILE + 20;
+            c.tY = offY + (targetShelf.gridY * TILE) + 20 + (pos * 35);
+            if (pos === 0 && Math.abs(c.x - c.tX) < 10 && Math.abs(c.y - c.tY) < 10) {
+                c.state = 'PICKING'; 
+                c.timer = 1.0 + Math.random();
+            }
+        } 
         else if (c.state === 'PICKING') {
             c.timer -= dt;
             if (c.timer <= 0) {
@@ -237,13 +213,12 @@ function updateCustomers(dt) {
             c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
         } 
         else if (c.state === 'LEAVING') {
-    // Return to the door relative to the current shop position
-    if (c.y > offY - 30) { 
-        c.tX = offX + (TILE * 2.5); 
-        c.tY = offY - (isMobileLayout ? 120 : 60); 
-    }
-    else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
-}
+            if (c.y > offY - 30) { 
+                c.tX = offX + (TILE * 2.5); 
+                c.tY = offY - (isMobileLayout ? 120 : 60); 
+            }
+            else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
+        }
 
         let dx = c.tX - c.x, dy = c.tY - c.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
@@ -262,25 +237,18 @@ function updateCustomers(dt) {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     let p = gameState.player;
-
     const shopWidth = COLS * TILE; 
     const sidewalkSize = isMobileLayout ? 180 : 80;
     
     // Environment
     ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - sidewalkSize);
-    ctx.fillRect(offX, 0, shopWidth, offY - sidewalkSize); // Road 
-
     ctx.fillStyle = "#555"; ctx.fillRect(0, offY - sidewalkSize, canvas.width, sidewalkSize);
-    ctx.fillRect(offX, offY - sidewalkSize, shopWidth, sidewalkSize); // Sidewalk
     
-    // Draw sidewalk lines only within the shop width
-ctx.strokeStyle = "#444";
-for(let i = 0; i <= shopWidth; i += TILE * 2) { 
-    ctx.beginPath(); 
-    ctx.moveTo(offX + i, offY - sidewalkSize); 
-    ctx.lineTo(offX + i, offY); 
-    ctx.stroke(); 
-}
+    ctx.strokeStyle = "#444";
+    for(let i = 0; i <= shopWidth; i += TILE * 2) { 
+        ctx.beginPath(); ctx.moveTo(offX + i, offY - sidewalkSize); ctx.lineTo(offX + i, offY); ctx.stroke(); 
+    }
+    
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
     
     if (gameState.mode === 'BUILD') {
@@ -289,8 +257,9 @@ for(let i = 0; i <= shopWidth; i += TILE * 2) {
         for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(offX, offY+j*TILE); ctx.lineTo(offX+COLS*TILE, offY+j*TILE); ctx.stroke(); }
     }
 
-    // PERMANENT RED DOTTED HITBOX
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.7)"; ctx.lineWidth = 2;
+    // Interaction Zone
+    ctx.setLineDash([5, 5]); 
+    ctx.strokeStyle = "rgba(255, 0, 0, 0.7)"; 
     ctx.strokeRect(offX + (gameState.counter.gridX - 1) * TILE + 5, offY + gameState.counter.gridY * TILE + 5, TILE - 10, (gameState.counter.h * TILE) - 10);
     ctx.setLineDash([]);
 
@@ -298,16 +267,11 @@ for(let i = 0; i <= shopWidth; i += TILE * 2) {
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
 
     gameState.deliveries.forEach(d => {
-    // Draw the box
-    ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
-    ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
-    
-    // NEW: Draw the quantity text overlay
-    ctx.fillStyle = "white"; 
-    ctx.font = "bold 10px Arial"; 
-    ctx.textAlign = "center";
-    ctx.fillText(d.qty, d.x, d.y + 4); 
-});
+        ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
+        ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
+        ctx.fillStyle = "white"; ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
+        ctx.fillText(d.qty, d.x, d.y + 4); 
+    });
 
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return;
@@ -336,31 +300,16 @@ for(let i = 0; i <= shopWidth; i += TILE * 2) {
 
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
     ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7,0,4,0,Math.PI*2); ctx.fill();
     ctx.restore();
+    
     if (p.holding > 0) { 
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.angle);
-    
-    // Draw the held box
-    ctx.fillStyle = "#d2b48c"; 
-    ctx.fillRect(10, -8, 16, 16); 
-    ctx.strokeStyle = "#8b4513";
-    ctx.strokeRect(10, -8, 16, 16);
-    
-    // Draw the number, but un-rotate it so it stays upright
-    ctx.rotate(-p.angle); 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 10px Arial";
-    ctx.textAlign = "center";
-    // We adjust the X/Y slightly because we are still in the player's translated space
-    const textX = Math.cos(p.angle) * 18;
-    const textY = Math.sin(p.angle) * 18 + 4;
-    ctx.fillText(p.holding, textX, textY);
-    
-    ctx.restore();
-}
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+        ctx.fillStyle = "#d2b48c"; ctx.fillRect(10, -8, 16, 16); 
+        ctx.strokeStyle = "#8b4513"; ctx.strokeRect(10, -8, 16, 16);
+        ctx.rotate(-p.angle); ctx.fillStyle = "white"; ctx.font = "bold 10px Arial"; ctx.textAlign = "center";
+        ctx.fillText(p.holding, Math.cos(p.angle) * 18, Math.sin(p.angle) * 18 + 4);
+        ctx.restore();
+    }
 
     if (transactionTimer > 0) {
         ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(p.x - 20, p.y - 30, 40, 6);
@@ -387,30 +336,26 @@ function loop(timestamp) {
         
         const shelfZone = { x: offX + (gameState.shelves[0].gridX - 1) * TILE, y: offY + gameState.shelves[0].gridY * TILE, w: TILE, h: gameState.shelves[0].h * TILE };
         if (p.holding > 0 && isInZone(p.x, p.y, shelfZone)) {
-    restockTimer += dt;
-    if (restockTimer > 0.05 && gameState.shelves[0].stock < gameState.shelves[0].max) {
-        gameState.shelves[0].stock++; 
-        p.holding--; 
-        restockTimer = 0;
-        if (p.holding === 0 || gameState.shelves[0].stock >= gameState.shelves[0].max) saveGame();
-    }
-}
+            restockTimer += dt;
+            if (restockTimer > 0.05 && gameState.shelves[0].stock < gameState.shelves[0].max) {
+                gameState.shelves[0].stock++; p.holding--; restockTimer = 0;
+                if (p.holding === 0 || gameState.shelves[0].stock >= gameState.shelves[0].max) saveGame();
+            }
+        }
     }
     updateCustomers(dt); draw();
     requestAnimationFrame(loop);
 }
 
-// Utility and Handlers
 setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
+
 function saveGame() { 
     const key = isMobileLayout ? 'scratcherSim_Mobile' : 'scratcherSimData';
     localStorage.setItem(key, JSON.stringify({
-        money: gameState.money, 
-        counter: gameState.counter, 
-        shelves: gameState.shelves, 
-        deliveries: gameState.deliveries
+        money: gameState.money, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries
     })); 
 }
+
 function loadGame() { 
     const key = isMobileLayout ? 'scratcherSim_Mobile' : 'scratcherSimData';
     const saved = localStorage.getItem(key); 
@@ -421,33 +366,27 @@ function loadGame() {
         gameState.shelves = loaded.shelves; 
         gameState.deliveries = loaded.deliveries; 
     } else if (isMobileLayout) {
-        // Default starter positions for the VERTICAL layout
-        gameState.counter = { gridX: 1, gridY: 10, w: 1, h: 3, type: 'counter' }; 
+        // Updated default starter positions for the VERTICAL layout
+        gameState.counter = { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' }; 
         gameState.shelves = [{ gridX: 7, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }];
     }
 }
 
 function resize() {
     const isPortrait = window.innerHeight > window.innerWidth;
-    
-    // Get the exact dimensions of the middle space
-    const rect = canvas.parentNode.getBoundingClientRect();
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 130; // 50px top + 80px bottom
+    canvas.width = isPortrait ? window.innerWidth : Math.min(window.innerWidth, 800);
+    // STRETCH CANVAS BETWEEN BARS
+    canvas.height = isPortrait ? (window.innerHeight - 160) : (window.innerHeight - 120);
 
-    // Recalculate TILE based on the actual width
-    const currentTile = isPortrait ? Math.floor(canvas.width / (COLS + 0.5)) : 40;
-    
-    offX = (canvas.width - (COLS * currentTile)) / 2;
-    // Position the shop logic relative to the top of the canvas
-    offY = isPortrait ? 120 : (canvas.height - (ROWS * currentTile)) / 2;
+    TILE = isPortrait ? Math.floor(canvas.width / 10) : 40;
+    offX = (canvas.width - (COLS * TILE)) / 2;
+    // START AT TOP BAR
+    offY = isPortrait ? 60 : (canvas.height - (ROWS * TILE)) / 2;
 
-    if (gameState.player.x === 0) {
-        gameState.player.x = offX + (COLS / 2) * currentTile;
-        gameState.player.y = offY + (ROWS / 2) * currentTile;
-        gameState.player.tX = gameState.player.x;
-        gameState.player.tY = gameState.player.y;
-    }
+    gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE;
+    gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE;
+    gameState.player.tX = gameState.player.x;
+    gameState.player.tY = gameState.player.y;
 }
 
 function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
@@ -455,7 +394,25 @@ function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
 function openModal() { document.getElementById('modal').style.display = 'block'; }
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scratcherSimData'); location.reload(); } }
+function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem(isMobileLayout ? 'scratcherSim_Mobile' : 'scratcherSimData'); location.reload(); } }
+
+function triggerAction() {
+    const p = gameState.player;
+    if (p.holding > 0) {
+        gameState.deliveries.push({ x: p.x, y: p.y, qty: p.holding });
+        p.holding = 0; saveGame(); return;
+    }
+    let pickedUp = false;
+    gameState.deliveries.forEach((d, i) => {
+        if (pickedUp) return;
+        if (Math.hypot(p.x - d.x, p.y - d.y) < TILE * 1.5 && p.holding < p.maxHolding) {
+            let take = Math.min(d.qty, p.maxHolding - p.holding);
+            p.holding += take; d.qty -= take;
+            if (d.qty <= 0) gameState.deliveries.splice(i, 1);
+            pickedUp = true; saveGame();
+        }
+    });
+}
 
 canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
 canvas.addEventListener('mousedown', (e) => {
@@ -464,92 +421,65 @@ canvas.addEventListener('mousedown', (e) => {
     const my = e.clientY - rect.top;
     const gX = Math.floor((mx - offX) / TILE);
     const gY = Math.floor((my - offY) / TILE);
-    
-    const p = gameState.player; // Fixes the 'p is not defined' error
 
-    // 1. DROP BOX LOGIC (Right-Click only)
-    if (e.button === 2) { 
-    triggerAction(); // Use the shared function for Right-Click
-    return;
-}
+    if (e.button === 2) { triggerAction(); return; } 
 
-    // 2. MOVEMENT & BUILD LOGIC (Left-Click only)
-    if (e.button === 0) {
-        if (gameState.mode === 'BUILD') {
-            if (!gameState.movingObj) {
-                if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) gameState.movingObj = gameState.counter;
-                gameState.shelves.forEach(s => { if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s; });
-            } else if (!gameState.isPlaced) {
-                if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
-                    gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
-                    const ui = document.getElementById('build-confirm');
-                    ui.style.display = 'flex'; ui.style.left = (rect.left + offX + gX * TILE) + 'px'; ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
+    if (gameState.mode === 'BUILD') {
+        if (!gameState.movingObj) {
+            if (gX >= gameState.counter.gridX && gX < gameState.counter.gridX + gameState.counter.w &&
+                gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) {
+                gameState.movingObj = gameState.counter; return;
+            }
+            for (let s of gameState.shelves) {
+                if (gX >= s.gridX && gX < s.gridX + s.w && gY >= s.gridY && gY < s.gridY + s.h) {
+                    gameState.movingObj = s; return;
                 }
             }
-        } else { 
-            // Now movement works even if holding a box!
-            p.tX = mx; 
-            p.tY = my; 
+        } else if (!gameState.isPlaced) {
+            if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS) {
+                gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
+                const ui = document.getElementById('build-confirm');
+                ui.style.display = 'flex'; 
+                ui.style.left = (rect.left + offX + gX * TILE) + 'px'; 
+                ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
+                return;
+            }
         }
+    } else { 
+        gameState.player.tX = mx; gameState.player.tY = my; 
     }
 });
 
-loadGame(); resize();
-requestAnimationFrame(loop);
-
-function triggerAction() {
-    const p = gameState.player;
-    
-    // 1. DROP LOGIC: If holding something, drop it at player's feet
-    if (p.holding > 0) {
-        gameState.deliveries.push({ x: p.x, y: p.y, qty: p.holding });
-        p.holding = 0;
-        saveGame();
-        return;
-    }
-
-    // 2. PICKUP LOGIC: Look for boxes near the player
-    let pickedUp = false;
-    gameState.deliveries.forEach((d, i) => {
-        if (pickedUp) return; // Only pick up one box at a time
-        
-        const dist = Math.hypot(p.x - d.x, p.y - d.y);
-        
-        // Short proximity check: Must be within 50 pixels
-        if (dist < TILE * 1.5 && p.holding < p.maxHolding) {
-            let space = p.maxHolding - p.holding;
-            let take = Math.min(d.qty, space);
-            p.holding += take;
-            d.qty -= take;
-            
-            if (d.qty <= 0) gameState.deliveries.splice(i, 1);
-            pickedUp = true;
-            saveGame();
-        }
-    });
-}
-
-// Handle single-touch for movement and multi-touch for action
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const touch = e.touches[0];
-    const p = gameState.player;
-    
-    // Account for CSS scaling
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const mx = (touch.clientX - rect.left) * scaleX;
-    const my = (touch.clientY - rect.top) * scaleY;
+    const mx = touch.clientX - rect.left;
+    const my = touch.clientY - rect.top;
+    const gX = Math.floor((mx - offX) / TILE);
+    const gY = Math.floor((my - offY) / TILE);
 
-    if (e.touches.length > 1) {
-        triggerAction();
+    if (gameState.mode === 'BUILD') {
+        if (!gameState.movingObj) {
+             if (gX >= gameState.counter.gridX && gX < gameState.counter.gridX + gameState.counter.w &&
+                 gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) {
+                 gameState.movingObj = gameState.counter;
+             }
+        } else if (!gameState.isPlaced) {
+             gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
+             const ui = document.getElementById('build-confirm');
+             ui.style.display = 'flex';
+             ui.style.left = (rect.left + offX + gX * TILE) + 'px';
+             ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
+        }
     } else {
-        p.tX = mx;
-        p.tY = my;
+        if (e.touches.length > 1) { triggerAction(); } 
+        else { gameState.player.tX = mx; gameState.player.tY = my; }
     }
 }, { passive: false });
+
+loadGame(); resize();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
