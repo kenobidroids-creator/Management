@@ -7,37 +7,36 @@
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
         body { 
-            margin: 0; overflow: hidden; background: #111; 
+            margin: 0; overflow: hidden; background: #000; 
             font-family: 'Segoe UI', sans-serif; touch-action: none; 
             display: flex; flex-direction: column; height: 100dvh; 
         }
-        #gameCanvas { flex: 1; display: block; background: #1a1a1a; width: 100%; height: 100%; }
-        #top-bar { position: relative; flex-shrink: 0; height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; }
-        #bottom-bar { position: relative; flex-shrink: 0; height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); }
-        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
-        .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
-        .btn-confirm { background: var(--accent); }
-        .btn-cancel { background: var(--danger); }
+        #top-bar { height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; z-index: 10; }
+        #gameCanvas { flex: 1; display: block; background: #1a1a1a; }
+        #bottom-bar { height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
+        
+        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; }
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
         .btn-build { background: #e91e63; }
-        .btn-action { background: #ff9800; border: 2px solid white; display: flex; justify-content: center; align-items: center; }
-        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
+        .btn-action { background: #ff9800; border: 2px solid white; }
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 80%; z-index: 110; color: black; }
     </style>
 </head>
 <body>
 
 <div id="top-bar">
     <div>CASH: <b id="ui-cash" style="color:var(--accent)">$500</b> | HELD: <b id="ui-held" style="color:var(--primary)">0</b></div>
-    <div id="mode-text" style="color: #ff9800;">PLAY MODE</div>
+    <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
 </div>
 
 <div id="build-confirm">
-    <button class="btn btn-confirm" onclick="confirmPlacement()">✓</button>
-    <button class="btn btn-cancel" onclick="clearBuildState()">X</button>
+    <button class="btn" style="background:var(--accent)" onclick="confirmPlacement()">✓</button>
+    <button class="btn" style="background:var(--danger)" onclick="clearBuildState()">X</button>
 </div>
 
 <div id="modal">
-    <h3 style="margin-top:0; color:black;">Office</h3>
-    <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK BOX ($50)</button>
+    <h3>Office</h3>
+    <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK ($50)</button>
     <button class="btn" style="background:var(--danger); width:100%; margin-top:10px" onclick="resetGame()">RESET DATA</button>
     <button class="btn" style="background:#555; width:100%; margin-top:10px" onclick="closeModal()">CLOSE</button>
 </div>
@@ -47,7 +46,6 @@
 <div id="bottom-bar">
     <button class="btn btn-build" onclick="toggleBuildMode()">BUILD</button>
     <button class="btn btn-action" onclick="triggerAction()">ACTION</button>
-    <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
 </div>
 
 <script>
@@ -56,48 +54,45 @@ const ctx = canvas.getContext('2d');
 window.oncontextmenu = (e) => e.preventDefault();
 
 let TILE = 0, COLS = 9, ROWS = 0, offX = 0, offY = 0;
-let lastTime = 0, transactionTimer = 0, restockTimer = 0;
+let lastTime = 0, transactionTimer = 0;
 
 let gameState = {
     money: 500, mode: 'PLAY',
-    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
-    counter: { gridX: 2, gridY: 4, w: 1, h: 3, type: 'counter' },
-    shelves: [{ gridX: 6, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
+    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 220, holding: 0, maxHolding: 50 },
+    counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
+    shelves: [{ gridX: 7, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [], deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
 };
 
 function resize() {
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 160; // Space between top and bottom bars
-    TILE = Math.floor(canvas.width / COLS);
+    canvas.height = window.innerHeight - 160; 
+    TILE = canvas.width / COLS;
     ROWS = Math.floor(canvas.height / TILE);
-    offX = (canvas.width - (COLS * TILE)) / 2;
-    offY = 0; // Start exactly at the top bar
+    offX = 0;
+    offY = 0;
 
+    // Initial player placement
     if (gameState.player.x === 0) {
-        gameState.player.x = offX + (COLS/2) * TILE;
-        gameState.player.y = offY + (ROWS-2) * TILE;
+        gameState.player.x = canvas.width / 2;
+        gameState.player.y = canvas.height - 100;
         gameState.player.tX = gameState.player.x;
         gameState.player.tY = gameState.player.y;
     }
 }
 
-function checkCollision(nx, ny, isAI = false) {
-    const doorMin = offX + TILE * 1, doorMax = offX + TILE * 4;
-    const atDoor = (nx > doorMin && nx < doorMax && ny < offY + 20 && ny > offY - 20);
-    if (!isAI && ny < offY) return (nx < 10 || nx > canvas.width - 10 || ny < -180);
-    if (!atDoor) {
-        if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || ny < offY + 15 || ny > offY + (ROWS * TILE) - 15) {
-            if (!isAI || ny > offY) return true;
-        }
+function checkCollision(nx, ny) {
+    if (nx < 15 || nx > canvas.width - 15 || ny < 15 || ny > canvas.height - 15) {
+        if (!(nx > TILE*3 && nx < TILE*6 && ny < 20)) return true;
     }
     let hit = false;
-    [gameState.counter, ...gameState.shelves].forEach(obj => {
-        if (gameState.movingObj === obj) return;
-        const r = { x: offX + obj.gridX * TILE, y: offY + obj.gridY * TILE, w: obj.w * TILE, h: obj.h * TILE };
-        if (nx + 12 > r.x && nx - 12 < r.x + r.w && ny + 12 > r.y && ny - 12 < r.y + r.h) hit = true;
-    });
+    const list = [gameState.counter, ...gameState.shelves];
+    for (let obj of list) {
+        if (gameState.movingObj === obj) continue;
+        const rx = offX + obj.gridX * TILE, ry = offY + obj.gridY * TILE;
+        if (nx + 12 > rx && nx - 12 < rx + obj.w * TILE && ny + 12 > ry && ny - 12 < ry + obj.h * TILE) hit = true;
+    }
     return hit;
 }
 
@@ -107,76 +102,82 @@ function update(dt) {
         let dx = p.tX - p.x, dy = p.tY - p.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
         if (dist > 5) {
+            p.angle = Math.atan2(dy, dx); // RESTORED ROTATION
             let vx = (dx/dist) * p.speed * dt, vy = (dy/dist) * p.speed * dt;
             if (!checkCollision(p.x + vx, p.y)) p.x += vx;
             if (!checkCollision(p.x, p.y + vy)) p.y += vy;
-            p.angle = Math.atan2(dy, dx); // Restore rotation
+        }
+        
+        // Shelf interaction
+        const s = gameState.shelves[0];
+        const sRect = { x: offX + (s.gridX-1)*TILE, y: offY + s.gridY*TILE, w: TILE*3, h: s.h*TILE };
+        if (p.holding > 0 && p.x > sRect.x && p.x < sRect.x+sRect.w && p.y > sRect.y && p.y < sRect.y+sRect.h) {
+            if (s.stock < s.max) { s.stock++; p.holding--; }
         }
     }
     updateCustomers(dt);
 }
 
+function updateCustomers(dt) {
+    gameState.customers.forEach((c, i) => {
+        let dx = c.tX - c.x, dy = c.tY - c.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 5) {
+            c.x += (dx/dist) * 80 * dt;
+            c.y += (dy/dist) * 80 * dt;
+        }
+    });
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const sidewalk = 180;
-    ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY); 
-    ctx.fillStyle = "#555"; ctx.fillRect(0, offY - sidewalk, canvas.width, sidewalk);
-    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
+    ctx.fillStyle = "#1e1e1e";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid & Hitbox
     if (gameState.mode === 'BUILD') {
         ctx.strokeStyle = "#333";
-        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(offX+i*TILE, offY); ctx.lineTo(offX+i*TILE, offY+ROWS*TILE); ctx.stroke(); }
-        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(offX, offY+j*TILE); ctx.lineTo(offX+COLS*TILE, offY+j*TILE); ctx.stroke(); }
+        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*TILE, 0); ctx.lineTo(i*TILE, canvas.height); ctx.stroke(); }
+        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*TILE); ctx.lineTo(canvas.width, j*TILE); ctx.stroke(); }
     }
-    
-    // Register Interaction Box
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.7)";
-    ctx.strokeRect(offX + (gameState.counter.gridX - 1) * TILE + 5, offY + gameState.counter.gridY * TILE + 5, TILE - 10, (gameState.counter.h * TILE) - 10);
+
+    // Register Zone
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+    ctx.strokeRect(offX + (gameState.counter.gridX-1)*TILE, offY + gameState.counter.gridY*TILE, TILE, gameState.counter.h*TILE);
     ctx.setLineDash([]);
 
-    // Walls
-    ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(offX, offY, COLS*TILE, ROWS*TILE);
-    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
-
-    // Furniture & Deliveries
-    gameState.deliveries.forEach(d => {
-        ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x-10, d.y-10, 20, 20);
-        ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.fillText(d.qty, d.x-5, d.y+5);
-    });
-
+    // Furniture
     [gameState.counter, ...gameState.shelves].forEach(obj => {
-        if (gameState.movingObj === obj) return;
-        ctx.fillStyle = "#555"; ctx.fillRect(offX + obj.gridX*TILE, offY + obj.gridY*TILE, obj.w*TILE, obj.h*TILE);
+        ctx.fillStyle = obj.type === 'counter' ? "#8d6e63" : "#5d4037";
+        ctx.fillRect(offX + obj.gridX*TILE, offY + obj.gridY*TILE, obj.w*TILE, obj.h*TILE);
     });
 
-    // Player with eyes
+    // Player with Eyes
     let p = gameState.player;
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
     ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7, -5, 3, 0, Math.PI*2); ctx.arc(7, 5, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(8, -5, 4, 0, Math.PI*2); ctx.arc(8, 5, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(10, -5, 1.5, 0, Math.PI*2); ctx.arc(10, 5, 1.5, 0, Math.PI*2); ctx.fill();
     ctx.restore();
 
-    gameState.customers.forEach(c => {
-        ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI*2); ctx.fill();
-    });
+    // Box Visual
+    if (p.holding > 0) {
+        ctx.fillStyle = "#d2b48c"; 
+        ctx.fillRect(p.x + Math.cos(p.angle)*15 - 8, p.y + Math.sin(p.angle)*15 - 8, 16, 16);
+    }
 
     document.getElementById('ui-cash').innerText = `$${gameState.money}`;
     document.getElementById('ui-held').innerText = p.holding;
 }
 
-// Keep your existing Logic functions (spawnCustomer, updateCustomers, saveGame, loadGame, toggleBuildMode, etc.)
-// ... [Function logic remains same as previous version] ...
-
 function triggerAction() {
     const p = gameState.player;
     if (p.holding > 0) {
         gameState.deliveries.push({ x: p.x, y: p.y, qty: p.holding });
-        p.holding = 0; saveGame(); return;
+        p.holding = 0; return;
     }
     gameState.deliveries.forEach((d, i) => {
-        if (Math.hypot(p.x - d.x, p.y - d.y) < 50) {
-            p.holding = d.qty; gameState.deliveries.splice(i, 1); saveGame();
+        if (Math.hypot(p.x - d.x, p.y - d.y) < 60) {
+            p.holding = d.qty; gameState.deliveries.splice(i, 1);
         }
     });
 }
@@ -186,20 +187,21 @@ function loop(t) {
     update(dt); draw(); requestAnimationFrame(loop);
 }
 
+function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; }
 function openModal() { document.getElementById('modal').style.display = 'block'; }
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function buyStock() { if(gameState.money >= 50){ gameState.money-=50; gameState.deliveries.push({x:offX+TILE*2, y:offY-50, qty:50}); saveGame(); } }
+function buyStock() { if(gameState.money >= 50){ gameState.money-=50; gameState.deliveries.push({x:canvas.width/2, y:40, qty:50}); closeModal(); } }
 function resetGame() { localStorage.clear(); location.reload(); }
 
 canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault(); const touch = e.touches[0];
+    e.preventDefault();
+    const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
-    const mx = touch.clientX - rect.left, my = touch.clientY - rect.top;
-    if (e.touches.length > 1) triggerAction();
-    else { gameState.player.tX = mx; gameState.player.tY = my; }
+    gameState.player.tX = touch.clientX - rect.left;
+    gameState.player.tY = touch.clientY - rect.top;
 }, {passive:false});
 
-resize(); loadGame(); requestAnimationFrame(loop);
+resize(); requestAnimationFrame(loop);
 </script>
 </body>
 </html>
