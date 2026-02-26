@@ -6,37 +6,38 @@
     <title>Scratcher Sim</title>
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
-        body { 
-            margin: 0; overflow: hidden; background: #000; 
-            font-family: 'Segoe UI', sans-serif; touch-action: none; 
-            display: flex; flex-direction: column; height: 100dvh; 
-        }
-        #top-bar { height: 60px; background: #000; display: flex; justify-content: space-around; align-items: center; color: white; border-bottom: 2px solid #333; z-index: 10; }
-        #gameCanvas { flex: 1; display: block; background: #1a1a1a; }
-        #bottom-bar { height: 100px; background: #000; display: flex; justify-content: center; align-items: center; gap: 10px; border-top: 2px solid #333; padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
-        
-        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; }
-        .btn { padding: 12px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
+        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
+        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
+        .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
+        .btn-confirm { background: var(--accent); }
+        .btn-cancel { background: var(--danger); }
         .btn-build { background: #e91e63; }
-        .btn-action { background: #ff9800; border: 2px solid white; }
-        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 80%; z-index: 110; color: black; }
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
+        canvas { display: block; background: #1a1a1a; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+
+        /* Mobile optimization to prevent zooming and selection */
+body { touch-action: none; -webkit-user-select: none; }
+/* Style for the new Action button */
+.btn-action { background: #ff9800; border: 2px solid white; }
     </style>
 </head>
 <body>
 
 <div id="top-bar">
     <div>CASH: <b id="ui-cash" style="color:var(--accent)">$500</b> | HELD: <b id="ui-held" style="color:var(--primary)">0</b></div>
-    <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
+    <div id="mode-text" style="color: #ff9800;">PLAY MODE</div>
 </div>
 
 <div id="build-confirm">
-    <button class="btn" style="background:var(--accent)" onclick="confirmPlacement()">✓</button>
-    <button class="btn" style="background:var(--danger)" onclick="clearBuildState()">X</button>
+    <button class="btn btn-confirm" onclick="confirmPlacement()">✓</button>
+    <button class="btn btn-cancel" onclick="clearBuildState()">X</button>
 </div>
 
 <div id="modal">
-    <h3>Office</h3>
-    <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK ($50)</button>
+    <h3 style="margin-top:0">Office</h3>
+    <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK BOX ($50)</button>
     <button class="btn" style="background:var(--danger); width:100%; margin-top:10px" onclick="resetGame()">RESET DATA</button>
     <button class="btn" style="background:#555; width:100%; margin-top:10px" onclick="closeModal()">CLOSE</button>
 </div>
@@ -44,164 +45,406 @@
 <canvas id="gameCanvas"></canvas>
 
 <div id="bottom-bar">
-    <button class="btn btn-build" onclick="toggleBuildMode()">BUILD</button>
-    <button class="btn btn-action" onclick="triggerAction()">ACTION</button>
+    <button class="btn btn-build" id="build-toggle" onclick="toggleBuildMode()">BUILD</button>
+    <button class="btn btn-action" id="action-btn" onclick="triggerAction()">ACTION</button>
+    <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
 </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+
 window.oncontextmenu = (e) => e.preventDefault();
 
-let TILE = 0, COLS = 9, ROWS = 0, offX = 0, offY = 0;
-let lastTime = 0, transactionTimer = 0;
+const TILE = 40;
+const COLS = 15;
+const ROWS = 12;
+let offX = 0, offY = 0;
+
+let lastTime = 0;
+let transactionTimer = 0;
+let restockTimer = 0;
 
 let gameState = {
     money: 500, mode: 'PLAY',
-    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 220, holding: 0, maxHolding: 50 },
-    counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
-    shelves: [{ gridX: 7, gridY: 4, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
-    customers: [], deliveries: [],
+    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
+    counter: { gridX: 2, gridY: 5, w: 1, h: 3, type: 'counter' },
+    shelves: [{ gridX: 13, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
+    customers: [],
+    deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
 };
 
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 160; 
-    TILE = canvas.width / COLS;
-    ROWS = Math.floor(canvas.height / TILE);
-    offX = 0;
-    offY = 0;
+function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY * TILE, w: obj.w * TILE, h: obj.h * TILE }; }
+function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
 
-    // Initial player placement
-    if (gameState.player.x === 0) {
-        gameState.player.x = canvas.width / 2;
-        gameState.player.y = canvas.height - 100;
-        gameState.player.tX = gameState.player.x;
-        gameState.player.tY = gameState.player.y;
+function checkCollision(nx, ny, isAI = false) {
+    const doorMinX = offX + TILE * 1;
+    const doorMaxX = offX + TILE * 4;
+    const isAtDoor = (nx > doorMinX && nx < doorMaxX && ny < offY + 20 && ny > offY - 20);
+
+    if (!isAI && ny < offY) {
+        if (nx < 20 || nx > canvas.width - 20 || ny < offY - 80) return true;
+        return false; 
+    }
+
+    if (!isAtDoor) {
+        if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || ny < offY + 15 || ny > offY + (ROWS * TILE) - 15) {
+            if (!isAI || ny > offY) return true;
+        }
+    }
+    
+    let collision = false;
+    [gameState.counter, ...gameState.shelves].forEach(obj => {
+        if (gameState.movingObj === obj) return; 
+        const r = getRect(obj);
+        if (nx + 12 > r.x && nx - 12 < r.x + r.w && ny + 12 > r.y && ny - 12 < r.y + r.h) collision = true;
+    });
+    return collision;
+}
+
+function buyStock() {
+    if (gameState.money >= 50) {
+        gameState.money -= 50;
+        gameState.deliveries.push({ x: offX + TILE * (1.5 + Math.random() * 2), y: offY - 40, qty: 50 });
+        saveGame();
     }
 }
 
-function checkCollision(nx, ny) {
-    if (nx < 15 || nx > canvas.width - 15 || ny < 15 || ny > canvas.height - 15) {
-        if (!(nx > TILE*3 && nx < TILE*6 && ny < 20)) return true;
-    }
-    let hit = false;
-    const list = [gameState.counter, ...gameState.shelves];
-    for (let obj of list) {
-        if (gameState.movingObj === obj) continue;
-        const rx = offX + obj.gridX * TILE, ry = offY + obj.gridY * TILE;
-        if (nx + 12 > rx && nx - 12 < rx + obj.w * TILE && ny + 12 > ry && ny - 12 < ry + obj.h * TILE) hit = true;
-    }
-    return hit;
-}
-
-function update(dt) {
-    let p = gameState.player;
-    if (gameState.mode === 'PLAY') {
-        let dx = p.tX - p.x, dy = p.tY - p.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 5) {
-            p.angle = Math.atan2(dy, dx); // RESTORED ROTATION
-            let vx = (dx/dist) * p.speed * dt, vy = (dy/dist) * p.speed * dt;
-            if (!checkCollision(p.x + vx, p.y)) p.x += vx;
-            if (!checkCollision(p.x, p.y + vy)) p.y += vy;
-        }
-        
-        // Shelf interaction
-        const s = gameState.shelves[0];
-        const sRect = { x: offX + (s.gridX-1)*TILE, y: offY + s.gridY*TILE, w: TILE*3, h: s.h*TILE };
-        if (p.holding > 0 && p.x > sRect.x && p.x < sRect.x+sRect.w && p.y > sRect.y && p.y < sRect.y+sRect.h) {
-            if (s.stock < s.max) { s.stock++; p.holding--; }
-        }
-    }
-    updateCustomers(dt);
+function spawnCustomer() {
+    if (gameState.mode !== 'PLAY') return;
+    const side = Math.random() > 0.5 ? -150 : canvas.width + 150;
+    const doorX = offX + TILE * 2.5;
+    gameState.customers.push({
+        id: Math.random(), x: side, y: offY - 60, tX: doorX, tY: offY - 60,
+        speed: 80 + Math.random() * 40, state: 'WALKING', 
+        basket: 0, timer: 0, queueTime: Date.now(),
+        color: `hsl(${Math.random() * 360}, 65%, 60%)`
+    });
 }
 
 function updateCustomers(dt) {
-    gameState.customers.forEach((c, i) => {
+    if (gameState.mode !== 'PLAY') return;
+
+    // Line management for both shelf and register
+    const shelfQueue = gameState.customers
+        .filter(c => c.state === 'TO_SHELF' || c.state === 'PICKING')
+        .sort((a,b) => a.queueTime - b.queueTime);
+
+    const payQueue = gameState.customers
+        .filter(c => c.state === 'WAITING')
+        .sort((a,b) => a.queueTime - b.queueTime);
+    
+    const regZone = {
+        x: offX + (gameState.counter.gridX - 1) * TILE,
+        y: offY + gameState.counter.gridY * TILE,
+        w: TILE, h: gameState.counter.h * TILE
+    };
+
+    if (payQueue.length > 0 && isInZone(gameState.player.x, gameState.player.y, regZone)) {
+        const firstC = payQueue[0];
+        if (Math.abs(firstC.x - firstC.tX) < 20) {
+            transactionTimer += dt;
+            if (transactionTimer >= 1.5) {
+                gameState.money += firstC.basket * 10;
+                firstC.basket = 0; firstC.state = 'LEAVING';
+                firstC.tX = offX + TILE * 2.5; firstC.tY = offY - 10;
+                transactionTimer = 0; saveGame();
+            }
+        }
+    } else { transactionTimer = 0; }
+
+    gameState.customers.forEach((c, index) => {
+        if (c.state === 'WALKING') {
+            if (Math.abs(c.x - c.tX) < 10) { c.state = 'ENTERING'; c.tY = offY + TILE * 1.5; }
+        } 
+        else if (c.state === 'ENTERING' && Math.abs(c.y - c.tY) < 10) {
+            c.state = 'TO_SHELF';
+            c.queueTime = Date.now();
+        } 
+        else if (c.state === 'TO_SHELF') {
+    const pos = shelfQueue.indexOf(c);
+    const targetShelf = gameState.shelves[0]; // Targets the first shelf
+    
+    // Dynamic standing spot: 1 tile to the left of the shelf, aligned with the top of it
+    // Then adds a 35px gap for each person in line behind the first
+    c.tX = offX + (targetShelf.gridX - 1) * TILE + 20;
+    c.tY = offY + (targetShelf.gridY * TILE) + 20 + (pos * 35);
+    
+    // Only the person at index 0 (front of line) can start picking
+    if (pos === 0 && Math.abs(c.x - c.tX) < 10 && Math.abs(c.y - c.tY) < 10) {
+        c.state = 'PICKING'; 
+        c.timer = 1.0 + Math.random();
+    }
+} 
+        else if (c.state === 'PICKING') {
+            c.timer -= dt;
+            if (c.timer <= 0) {
+                const s = gameState.shelves[0];
+                const grab = Math.random() < 0.9 ? Math.min(s.stock, Math.floor(Math.random() * 3) + 1) : 0;
+                if (grab > 0) {
+                    s.stock -= grab; c.basket = grab;
+                    c.state = 'WAITING'; c.queueTime = Date.now();
+                    saveGame();
+                } else {
+                    c.state = 'LEAVING';
+                    c.tX = offX + TILE * 2.5; c.tY = offY + TILE;
+                }
+            }
+        } 
+        else if (c.state === 'WAITING') {
+            const pos = payQueue.indexOf(c);
+            c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 35 + (pos * 45);
+            c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
+        } 
+        else if (c.state === 'LEAVING') {
+            if (c.y > offY - 30) { c.tX = offX + TILE * 2.5; c.tY = offY - 60; }
+            else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
+        }
+
         let dx = c.tX - c.x, dy = c.tY - c.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 5) {
-            c.x += (dx/dist) * 80 * dt;
-            c.y += (dy/dist) * 80 * dt;
+        if (dist > 3) {
+            let vx = (dx/dist) * c.speed * dt, vy = (dy/dist) * c.speed * dt;
+            if (!checkCollision(c.x + vx, c.y, true)) c.x += vx;
+            if (!checkCollision(c.x, c.y + vy, true)) c.y += vy;
+        }
+
+        if ((c.x < -250 || c.x > canvas.width + 250) && c.state === 'LEAVING') {
+            gameState.customers.splice(index, 1);
         }
     });
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#1e1e1e";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    let p = gameState.player;
+    
+    // Environment
+    ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - 80); 
+    ctx.fillStyle = "#555"; ctx.fillRect(0, offY - 80, canvas.width, 80); 
+    ctx.strokeStyle = "#444";
+    for(let i=0; i<canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, offY-80); ctx.lineTo(i, offY); ctx.stroke(); }
+    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
+    
     if (gameState.mode === 'BUILD') {
         ctx.strokeStyle = "#333";
-        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*TILE, 0); ctx.lineTo(i*TILE, canvas.height); ctx.stroke(); }
-        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*TILE); ctx.lineTo(canvas.width, j*TILE); ctx.stroke(); }
+        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(offX+i*TILE, offY); ctx.lineTo(offX+i*TILE, offY+ROWS*TILE); ctx.stroke(); }
+        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(offX, offY+j*TILE); ctx.lineTo(offX+COLS*TILE, offY+j*TILE); ctx.stroke(); }
     }
 
-    // Register Zone
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-    ctx.strokeRect(offX + (gameState.counter.gridX-1)*TILE, offY + gameState.counter.gridY*TILE, TILE, gameState.counter.h*TILE);
+    // PERMANENT RED DOTTED HITBOX
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.7)"; ctx.lineWidth = 2;
+    ctx.strokeRect(offX + (gameState.counter.gridX - 1) * TILE + 5, offY + gameState.counter.gridY * TILE + 5, TILE - 10, (gameState.counter.h * TILE) - 10);
     ctx.setLineDash([]);
 
-    // Furniture
+    ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(offX, offY, COLS*TILE, ROWS*TILE);
+    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
+
+    gameState.deliveries.forEach(d => {
+    // Draw the box
+    ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
+    ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
+    
+    // NEW: Draw the quantity text overlay
+    ctx.fillStyle = "white"; 
+    ctx.font = "bold 10px Arial"; 
+    ctx.textAlign = "center";
+    ctx.fillText(d.qty, d.x, d.y + 4); 
+});
+
     [gameState.counter, ...gameState.shelves].forEach(obj => {
-        ctx.fillStyle = obj.type === 'counter' ? "#8d6e63" : "#5d4037";
-        ctx.fillRect(offX + obj.gridX*TILE, offY + obj.gridY*TILE, obj.w*TILE, obj.h*TILE);
+        if (gameState.movingObj === obj) return;
+        ctx.fillStyle = "#555"; ctx.fillRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
+        if (obj.type === 'shelf') {
+            ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.textAlign = "left";
+            ctx.fillText(`STOCK: ${obj.stock}`, offX + obj.gridX * TILE, offY + obj.gridY * TILE - 5);
+        }
     });
 
-    // Player with Eyes
-    let p = gameState.player;
-    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-    ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(8, -5, 4, 0, Math.PI*2); ctx.arc(8, 5, 4, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = 'black'; ctx.beginPath(); ctx.arc(10, -5, 1.5, 0, Math.PI*2); ctx.arc(10, 5, 1.5, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-
-    // Box Visual
-    if (p.holding > 0) {
-        ctx.fillStyle = "#d2b48c"; 
-        ctx.fillRect(p.x + Math.cos(p.angle)*15 - 8, p.y + Math.sin(p.angle)*15 - 8, 16, 16);
+    if (gameState.movingObj) {
+        let gx = gameState.isPlaced ? gameState.tempPos.gX : Math.floor((gameState.mouse.x - offX) / TILE);
+        let gy = gameState.isPlaced ? gameState.tempPos.gY : Math.floor((gameState.mouse.y - offY) / TILE);
+        ctx.globalAlpha = 0.4;
+        const blocksDoor = (gx < 5 && gy < 3);
+        const oob = (gx < 0 || gx + gameState.movingObj.w > COLS || gy < 0 || gy + gameState.movingObj.h > ROWS || blocksDoor);
+        ctx.fillStyle = oob ? "red" : "cyan";
+        ctx.fillRect(offX + gx * TILE, offY + gy * TILE, gameState.movingObj.w * TILE, gameState.movingObj.h * TILE);
+        ctx.globalAlpha = 1.0;
     }
 
+    gameState.customers.forEach(c => {
+        ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI*2); ctx.fill();
+        if (c.basket > 0) { ctx.fillStyle = "white"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center"; ctx.fillText(c.basket, c.x, c.y + 4); }
+    });
+
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+    ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7,0,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    if (p.holding > 0) { 
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    
+    // Draw the held box
+    ctx.fillStyle = "#d2b48c"; 
+    ctx.fillRect(10, -8, 16, 16); 
+    ctx.strokeStyle = "#8b4513";
+    ctx.strokeRect(10, -8, 16, 16);
+    
+    // Draw the number, but un-rotate it so it stays upright
+    ctx.rotate(-p.angle); 
+    ctx.fillStyle = "white";
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    // We adjust the X/Y slightly because we are still in the player's translated space
+    const textX = Math.cos(p.angle) * 18;
+    const textY = Math.sin(p.angle) * 18 + 4;
+    ctx.fillText(p.holding, textX, textY);
+    
+    ctx.restore();
+}
+
+    if (transactionTimer > 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(p.x - 20, p.y - 30, 40, 6);
+        ctx.fillStyle = "#4CAF50"; ctx.fillRect(p.x - 20, p.y - 30, (transactionTimer/1.5) * 40, 6);
+    }
+    
     document.getElementById('ui-cash').innerText = `$${gameState.money}`;
     document.getElementById('ui-held').innerText = p.holding;
 }
 
+function loop(timestamp) {
+    let dt = (timestamp - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; lastTime = timestamp;
+    let p = gameState.player;
+    if (gameState.mode === 'PLAY') {
+        let dx = p.tX - p.x, dy = p.tY - p.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 5) {
+            let vx = (dx/dist) * p.speed * dt, vy = (dy/dist) * p.speed * dt;
+            if (!checkCollision(p.x + vx, p.y)) p.x += vx;
+            if (!checkCollision(p.x, p.y + vy)) p.y += vy;
+            p.angle = Math.atan2(dy, dx);
+        }
+        
+        const shelfZone = { x: offX + (gameState.shelves[0].gridX - 1) * TILE, y: offY + gameState.shelves[0].gridY * TILE, w: TILE, h: gameState.shelves[0].h * TILE };
+        if (p.holding > 0 && isInZone(p.x, p.y, shelfZone)) {
+    restockTimer += dt;
+    if (restockTimer > 0.05 && gameState.shelves[0].stock < gameState.shelves[0].max) {
+        gameState.shelves[0].stock++; 
+        p.holding--; 
+        restockTimer = 0;
+        if (p.holding === 0 || gameState.shelves[0].stock >= gameState.shelves[0].max) saveGame();
+    }
+}
+    }
+    updateCustomers(dt); draw();
+    requestAnimationFrame(loop);
+}
+
+// Utility and Handlers
+setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
+function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
+function loadGame() { const saved = localStorage.getItem('scratcherSimData'); if (saved) { const loaded = JSON.parse(saved); gameState.money = loaded.money ?? 500; if (loaded.counter) gameState.counter = loaded.counter; if (loaded.shelves) gameState.shelves = loaded.shelves; if (loaded.deliveries) gameState.deliveries = loaded.deliveries; } }
+function resize() { canvas.width = Math.min(window.innerWidth, 800); canvas.height = window.innerHeight; offX = (canvas.width - (COLS * TILE)) / 2; offY = (canvas.height - (ROWS * TILE)) / 2 + 50; gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; gameState.player.tX = gameState.player.x; gameState.player.tY = gameState.player.y; }
+function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
+function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX = gameState.tempPos.gX; gameState.movingObj.gridY = gameState.tempPos.gY; } clearBuildState(); saveGame(); }
+function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
+function openModal() { document.getElementById('modal').style.display = 'block'; }
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scratcherSimData'); location.reload(); } }
+
+canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const gX = Math.floor((mx - offX) / TILE);
+    const gY = Math.floor((my - offY) / TILE);
+    
+    const p = gameState.player; // Fixes the 'p is not defined' error
+
+    // 1. DROP BOX LOGIC (Right-Click only)
+    if (e.button === 2) { 
+    triggerAction(); // Use the shared function for Right-Click
+    return;
+}
+
+    // 2. MOVEMENT & BUILD LOGIC (Left-Click only)
+    if (e.button === 0) {
+        if (gameState.mode === 'BUILD') {
+            if (!gameState.movingObj) {
+                if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) gameState.movingObj = gameState.counter;
+                gameState.shelves.forEach(s => { if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s; });
+            } else if (!gameState.isPlaced) {
+                if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
+                    gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
+                    const ui = document.getElementById('build-confirm');
+                    ui.style.display = 'flex'; ui.style.left = (rect.left + offX + gX * TILE) + 'px'; ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
+                }
+            }
+        } else { 
+            // Now movement works even if holding a box!
+            p.tX = mx; 
+            p.tY = my; 
+        }
+    }
+});
+
+loadGame(); resize();
+requestAnimationFrame(loop);
+
 function triggerAction() {
     const p = gameState.player;
+    
+    // 1. DROP LOGIC: If holding something, drop it at player's feet
     if (p.holding > 0) {
         gameState.deliveries.push({ x: p.x, y: p.y, qty: p.holding });
-        p.holding = 0; return;
+        p.holding = 0;
+        saveGame();
+        return;
     }
+
+    // 2. PICKUP LOGIC: Look for boxes near the player
+    let pickedUp = false;
     gameState.deliveries.forEach((d, i) => {
-        if (Math.hypot(p.x - d.x, p.y - d.y) < 60) {
-            p.holding = d.qty; gameState.deliveries.splice(i, 1);
+        if (pickedUp) return; // Only pick up one box at a time
+        
+        const dist = Math.hypot(p.x - d.x, p.y - d.y);
+        
+        // Short proximity check: Must be within 50 pixels
+        if (dist < 50 && p.holding < p.maxHolding) {
+            let space = p.maxHolding - p.holding;
+            let take = Math.min(d.qty, space);
+            p.holding += take;
+            d.qty -= take;
+            
+            if (d.qty <= 0) gameState.deliveries.splice(i, 1);
+            pickedUp = true;
+            saveGame();
         }
     });
 }
 
-function loop(t) {
-    let dt = Math.min((t - lastTime)/1000, 0.1); lastTime = t;
-    update(dt); draw(); requestAnimationFrame(loop);
-}
-
-function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; }
-function openModal() { document.getElementById('modal').style.display = 'block'; }
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function buyStock() { if(gameState.money >= 50){ gameState.money-=50; gameState.deliveries.push({x:canvas.width/2, y:40, qty:50}); closeModal(); } }
-function resetGame() { localStorage.clear(); location.reload(); }
-
+// Handle single-touch for movement and multi-touch for action
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
-    gameState.player.tX = touch.clientX - rect.left;
-    gameState.player.tY = touch.clientY - rect.top;
-}, {passive:false});
+    const touch = e.touches[0];
+    const mx = touch.clientX - rect.left;
+    const my = touch.clientY - rect.top;
 
-resize(); requestAnimationFrame(loop);
+    if (e.touches.length > 1) {
+        // Two-finger tap triggers the action (like a right-click)
+        triggerAction();
+    } else {
+        // Single tap moves the player
+        gameState.player.tX = mx;
+        gameState.player.tY = my;
+    }
+}, { passive: false });
 </script>
 </body>
 </html>
