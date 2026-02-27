@@ -354,8 +354,12 @@ function resize() {
     canvas.height = window.innerHeight; 
     TILE = Math.floor(canvas.width / COLS);
     ROWS = Math.floor((canvas.height - 150) / TILE); 
-    offX = 0; 
-    offY = 80; 
+    // Center the grid horizontally
+    offX = (canvas.width - (COLS * TILE)) / 2; 
+    // Position the grid below the top bar and leave room for the bottom bar
+    offY = 60; 
+    const availableHeight = canvas.height - 180; // Leaving space for UI
+    ROWS = Math.floor(availableHeight / TILE); 
     gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; 
     gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; 
     gameState.player.tX = gameState.player.x; 
