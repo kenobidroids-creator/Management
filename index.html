@@ -6,9 +6,9 @@
     <title>Scratcher Sim</title>
     <style>
         :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
-        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 110vh; }
         #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
-        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 70px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
+        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
         #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
         .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
         .btn-confirm { background: var(--accent); }
@@ -56,9 +56,9 @@ const ctx = canvas.getContext('2d');
 
 window.oncontextmenu = (e) => e.preventDefault();
 
-const TILE = 40;
-const COLS = 15;
-const ROWS = 12;
+let TILE = 40;
+let COLS = 15;
+let ROWS = 12;
 let offX = 0, offY = 0;
 
 let lastTime = 0;
@@ -68,8 +68,8 @@ let restockTimer = 0;
 let gameState = {
     money: 500, mode: 'PLAY',
     player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
-    counter: { gridX: 2, gridY: 5, w: 1, h: 3, type: 'counter' },
-    shelves: [{ gridX: 13, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
+    counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
+    shelves: [{ gridX: 7, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [],
     deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
@@ -348,7 +348,19 @@ function loop(timestamp) {
 setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
 function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
 function loadGame() { const saved = localStorage.getItem('scratcherSimData'); if (saved) { const loaded = JSON.parse(saved); gameState.money = loaded.money ?? 500; if (loaded.counter) gameState.counter = loaded.counter; if (loaded.shelves) gameState.shelves = loaded.shelves; if (loaded.deliveries) gameState.deliveries = loaded.deliveries; } }
-function resize() { canvas.width = Math.min(window.innerWidth, 800); canvas.height = window.innerHeight; offX = (canvas.width - (COLS * TILE)) / 2; offY = (canvas.height - (ROWS * TILE)) / 2 + 50; gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; gameState.player.tX = gameState.player.x; gameState.player.tY = gameState.player.y; }
+// UPDATED RESIZE FOR VERTICAL PORTRAIT
+function resize() { 
+    canvas.width = window.innerWidth; 
+    canvas.height = window.innerHeight; 
+    TILE = Math.floor(canvas.width / COLS);
+    ROWS = Math.floor((canvas.height - 150) / TILE); 
+    offX = 0; 
+    offY = 80; 
+    gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; 
+    gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; 
+    gameState.player.tX = gameState.player.x; 
+    gameState.player.tY = gameState.player.y; 
+}
 function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
 function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX = gameState.tempPos.gX; gameState.movingObj.gridY = gameState.tempPos.gY; } clearBuildState(); saveGame(); }
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
@@ -428,21 +440,66 @@ function triggerAction() {
     });
 }
 
+// NEW: Helper to convert screen touch to game grid coordinates
+function getTouchPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top
+    };
+}
+
 // Handle single-touch for movement and multi-touch for action
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const mx = touch.clientX - rect.left;
-    const my = touch.clientY - rect.top;
+    const pos = getTouchPos(e);
+    const gX = Math.floor((pos.x - offX) / TILE);
+    const gY = Math.floor((pos.y - offY) / TILE);
 
-    if (e.touches.length > 1) {
-        // Two-finger tap triggers the action (like a right-click)
-        triggerAction();
+    if (gameState.mode === 'BUILD') {
+        // 1. SELECTING AN OBJECT
+        if (!gameState.movingObj) {
+            // Check Counter
+            if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) {
+                gameState.movingObj = gameState.counter;
+            }
+            // Check Shelves
+            gameState.shelves.forEach(s => {
+                if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s;
+            });
+        } 
+        // 2. PLACING THE OBJECT
+        else if (!gameState.isPlaced) {
+            // Ensure placement is within bounds and not blocking the door
+            if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
+                gameState.tempPos = { gX, gY };
+                gameState.isPlaced = true;
+                
+                // Show the UI buttons at the touch location
+                const ui = document.getElementById('build-confirm');
+                ui.style.display = 'flex';
+                ui.style.left = pos.x + 'px';
+                ui.style.top = (pos.y - 60) + 'px';
+            }
+        }
     } else {
-        // Single tap moves the player
-        gameState.player.tX = mx;
-        gameState.player.tY = my;
+        // REGULAR PLAY MODE: Handle movement and actions
+        if (e.touches.length > 1) {
+            triggerAction();
+        } else {
+            gameState.player.tX = pos.x;
+            gameState.player.tY = pos.y;
+        }
+    }
+}, { passive: false });
+
+// Update mouse/touch position for the "Ghost" furniture preview
+canvas.addEventListener('touchmove', (e) => {
+    if (gameState.mode === 'BUILD' && gameState.movingObj && !gameState.isPlaced) {
+        const pos = getTouchPos(e);
+        gameState.mouse.x = pos.x;
+        gameState.mouse.y = pos.y;
     }
 }, { passive: false });
 </script>
