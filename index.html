@@ -551,28 +551,33 @@ function openScratcher() {
 }
 function handleScratch(e) {
     if (!isScratching || !scratchActive) return;
-    const rect = sCanvas.getBoundingClientRect();
-    const touch = e.touches ? e.touches[0] : e;
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-
-    // Prevent the page from scrolling while scratching
+    
+    // Prevent scrolling on mobile
     if (e.touches) e.preventDefault(); 
-    scratch(e);
+
+    const rect = sCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
     sCtx.globalCompositeOperation = 'destination-out';
-    sCtx.lineWidth = 40; // Make the scratcher path wider for fingers
+    sCtx.lineWidth = 40; // Fixed size since sizeLvl was undefined
     sCtx.lineCap = 'round';
     sCtx.lineJoin = 'round';
+
     sCtx.beginPath();
-    sCtx.moveTo(x, y);
+    // Use last coordinates to draw a continuous line
+    sCtx.moveTo(lastX || x, lastY || y);
     sCtx.lineTo(x, y);
     sCtx.stroke();
 
     lastX = x;
     lastY = y;
 
-    if (Math.random() > 0.95) checkScratchWin();
+    // Check for win condition
+    if (Math.random() > 0.9) checkScratchWin();
 }
 
 function checkScratchWin() {
@@ -667,13 +672,28 @@ canvas.addEventListener('touchmove', (e) => {
     }
 }, { passive: false });
 
-// --- Add Event Listeners for Scratcher ---
-sCanvas.addEventListener('mousedown', () => isScratching = true);
-window.addEventListener('mouseup', () => isScratching = false);
+// 2. Updated Event Listeners
+// Mouse Listeners
+sCanvas.addEventListener('mousedown', (e) => {
+    isScratching = true;
+    const rect = sCanvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
+});
+window.addEventListener('mouseup', () => { isScratching = false; lastX = null; lastY = null; });
 sCanvas.addEventListener('mousemove', handleScratch);
-sCanvas.addEventListener('touchstart', (e) => { isScratching = true; handleScratch(e); }, {passive: false});
-sCanvas.addEventListener('touchend', () => isScratching = false);
+
+// Touch Listeners
+sCanvas.addEventListener('touchstart', (e) => {
+    isScratching = true;
+    const rect = sCanvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    lastX = touch.clientX - rect.left;
+    lastY = touch.clientY - rect.top;
+    handleScratch(e);
+}, {passive: false});
 sCanvas.addEventListener('touchmove', handleScratch, {passive: false});
+sCanvas.addEventListener('touchend', () => { isScratching = false; lastX = null; lastY = null; });
 </script>
 </body>
 </html>
