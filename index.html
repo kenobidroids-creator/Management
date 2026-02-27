@@ -15,6 +15,35 @@
         .btn-cancel { background: var(--danger); }
         .btn-build { background: #e91e63; }
         #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
+
+        #scratcher-modal {
+        display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: #334155; padding: 20px; border-radius: 20px; z-index: 200;
+        box-shadow: 0 0 50px rgba(0,0,0,0.8); text-align: center;
+    }
+    /* The container must be relative so the canvas can sit on top */
+    #scratch-container { 
+        position: relative; width: 280px; height: 280px; 
+        background: #white; margin: 10px auto; border-radius: 10px; overflow: hidden;
+    }
+    .prize-val { position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #1e293b; font-weight: bold; }
+    /* The canvas sits on the top layer */
+    #scratch-canvas { position: absolute; top: 0; left: 0; z-index: 10; background: transparent !important; /* Vital for destination-out to work */ touch-action: none; }
+    /* 2x2 Grid Layout */
+    /* The grid sits at the bottom layer */
+    .prize-grid {
+        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+        width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
+    }
+    .prize-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    color: #333 !important; /* Force dark color so emojis show up */
+    border: 1px solid #f0f0f0;
+}
+
         canvas { display: block; background: #1a1a1a; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
 
         /* Mobile optimization to prevent zooming and selection */
@@ -40,6 +69,19 @@ body { touch-action: none; -webkit-user-select: none; }
     <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK BOX ($50)</button>
     <button class="btn" style="background:var(--danger); width:100%; margin-top:10px" onclick="resetGame()">RESET DATA</button>
     <button class="btn" style="background:#555; width:100%; margin-top:10px" onclick="closeModal()">CLOSE</button>
+</div>
+
+<div id="scratcher-modal" class="modal" style="display:none; background:#334155; color:white; padding:20px;">
+    <h3 style="margin-top:0">LUCKY SCRATCHER</h3>
+    <div id="scratch-container">
+        <div class="prize-grid" id="prize-grid">
+            <div class="prize-cell">?</div><div class="prize-cell">?</div>
+            <div class="prize-cell">?</div><div class="prize-cell">?</div>
+        </div>
+        <canvas id="scratch-canvas" width="280" height="280"></canvas>
+    </div>
+    <p>Match 2 for $10, Match 3 for $50!</p>
+    <button class="btn btn-cancel" onclick="closeScratcher()">CLOSE</button>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -74,6 +116,15 @@ let gameState = {
     deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
 };
+
+// --- New Scratcher Variables ---
+const sCanvas = document.getElementById('scratch-canvas');
+const sCtx = sCanvas.getContext('2d');
+let scratchActive = false;
+let isScratching = false;
+let scratchCooldown = 5.0; // Prevents the shelf from "spamming" cards
+const symbols = ['🍒', '💎', '🍋', '⭐', '🔔']; // Symbols from your scratcher file
+let currentPendingWin = 0;
 
 function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY * TILE, w: obj.w * TILE, h: obj.h * TILE }; }
 function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
@@ -124,6 +175,7 @@ function spawnCustomer() {
 }
 
 function updateCustomers(dt) {
+    let p = gameState.player;
     if (gameState.mode !== 'PLAY') return;
 
     // Line management for both shelf and register
@@ -318,6 +370,9 @@ function draw() {
 function loop(timestamp) {
     let dt = (timestamp - lastTime) / 1000;
     if (dt > 0.1) dt = 0.1; lastTime = timestamp;
+
+    if (scratchCooldown > 0) scratchCooldown -= dt; // Count down the timer
+
     let p = gameState.player;
     if (gameState.mode === 'PLAY') {
         let dx = p.tX - p.x, dy = p.tY - p.y;
@@ -329,16 +384,33 @@ function loop(timestamp) {
             p.angle = Math.atan2(dy, dx);
         }
         
-        const shelfZone = { x: offX + (gameState.shelves[0].gridX - 1) * TILE, y: offY + gameState.shelves[0].gridY * TILE, w: TILE, h: gameState.shelves[0].h * TILE };
-        if (p.holding > 0 && isInZone(p.x, p.y, shelfZone)) {
-    restockTimer += dt;
-    if (restockTimer > 0.05 && gameState.shelves[0].stock < gameState.shelves[0].max) {
-        gameState.shelves[0].stock++; 
-        p.holding--; 
-        restockTimer = 0;
-        if (p.holding === 0 || gameState.shelves[0].stock >= gameState.shelves[0].max) saveGame();
-    }
-}
+        // 2. NEW INTERACTION SECTION (FROM THE PHOTO)
+        const s = gameState.shelves[0];
+        const shelfZone = { 
+            x: offX + (s.gridX - 1) * TILE, 
+            y: offY + s.gridY * TILE, 
+            w: TILE, 
+            h: s.h * TILE 
+        };
+
+        if (isInZone(p.x, p.y, shelfZone)) {
+            if (p.holding > 0) {
+                // If holding a box, restock the shelf
+                restockTimer += dt;
+                if (restockTimer > 0.05 && s.stock < s.max) {
+                    s.stock++; 
+                    p.holding--; 
+                    restockTimer = 0;
+                    if (p.holding === 0 || s.stock >= s.max) saveGame();
+                }
+            } else if (s.stock > 0 && !scratchActive && scratchCooldown <= 0) {
+                // OPEN SCRATCHER WITH COOLDOWN
+                s.stock--;
+                scratchCooldown = 5.0; // Wait 5 seconds before another card is allowed
+                openScratcher();
+                saveGame();
+            }
+        }
     }
     updateCustomers(dt); draw();
     requestAnimationFrame(loop);
@@ -444,6 +516,86 @@ function triggerAction() {
     });
 }
 
+function openScratcher() {
+    scratchActive = true;
+    document.getElementById('scratcher-modal').style.display = 'block';
+    
+    // 1. Clear previous symbols and generate new ones
+    const results = [];
+    const cells = document.querySelectorAll('.prize-cell');
+    cells.forEach(cell => {
+        const s = symbols[Math.floor(Math.random() * symbols.length)];
+        cell.innerText = s;
+        results.push(s);
+    });
+
+    // 2. Determine Payout Tier
+    const counts = {};
+    results.forEach(s => counts[s] = (counts[s] || 0) + 1);
+    const maxMatch = Math.max(...Object.values(counts));
+    
+    if (maxMatch >= 3) currentPendingWin = 50;
+    else if (maxMatch === 2) currentPendingWin = 10;
+    else currentPendingWin = 0;
+
+    // 3. Draw the Foil Texture
+    sCtx.globalCompositeOperation = 'source-over';
+    sCtx.fillStyle = '#cbd5e1'; // Silver color
+    sCtx.fillRect(0, 0, 280, 280);
+    
+    // Add "grain" to the foil
+    sCtx.fillStyle = '#94a3b8';
+    for(let i=0; i<400; i++) {
+        sCtx.fillRect(Math.random()*280, Math.random()*280, 2, 2);
+    }
+}
+function handleScratch(e) {
+    if (!isScratching || !scratchActive) return;
+    const rect = sCanvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    sCtx.globalCompositeOperation = 'destination-out';
+    sCtx.lineWidth = 30;
+    sCtx.lineCap = 'round';
+    sCtx.beginPath();
+    sCtx.moveTo(x, y);
+    sCtx.lineTo(x, y);
+    sCtx.stroke();
+
+    if (Math.random() > 0.95) checkScratchWin();
+}
+
+function checkScratchWin() {
+    const data = sCtx.getImageData(0,0,280,280).data;
+    let trans = 0;
+    for(let i=3; i<data.length; i+=4) if(data[i] === 0) trans++;
+    
+    // Threshold: 60% revealed
+    if ((trans / (280*280)) > 0.60) {
+        scratchActive = false; // Prevent further scratching
+        
+        setTimeout(() => {
+            if (currentPendingWin > 0) {
+                gameState.money += currentPendingWin;
+                alert(`WINNER! You matched symbols and won $${currentPendingWin}!`);
+            } else {
+                alert("No matches this time. Try again!");
+            }
+            saveGame();
+            closeScratcher();
+        }, 500);
+    }
+}
+
+function closeScratcher() {
+    scratchActive = false;
+    scratchCooldown = 5.0;
+    document.getElementById('scratcher-modal').style.display = 'none';
+    sCtx.clearRect(0,0,280,280);
+}
+
 // NEW: Helper to convert screen touch to game grid coordinates
 function getTouchPos(e) {
     const rect = canvas.getBoundingClientRect();
@@ -506,6 +658,14 @@ canvas.addEventListener('touchmove', (e) => {
         gameState.mouse.y = pos.y;
     }
 }, { passive: false });
+
+// --- Add Event Listeners for Scratcher ---
+sCanvas.addEventListener('mousedown', () => isScratching = true);
+window.addEventListener('mouseup', () => isScratching = false);
+sCanvas.addEventListener('mousemove', handleScratch);
+sCanvas.addEventListener('touchstart', (e) => { isScratching = true; handleScratch(e); }, {passive: false});
+sCanvas.addEventListener('touchend', () => isScratching = false);
+sCanvas.addEventListener('touchmove', handleScratch, {passive: false});
 </script>
 </body>
 </html>
