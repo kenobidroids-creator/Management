@@ -828,6 +828,11 @@ function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight - (topBarH + bottomBarH);
 
+    // Calculate tile size for both dimensions
+    // We add a '1' tile buffer (COLS + 1) so it's not touching the screen edge
+    const maxTileWidth = canvas.width / (COLS + 1); 
+    const maxTileHeight = canvas.height / (ROWS + 1);
+
     // This is the magic formula:
     // We add a '2' tile buffer so the shop isn't touching the very edge of the screen
 
@@ -840,7 +845,7 @@ function resize() {
     // This makes sure 15 columns and 12 rows ALWAYS fit the screen.
     const tileW = Math.floor(canvas.width / (INTERNAL_COLS + 2)); 
     const tileH = Math.floor((canvas.height - 100) / INTERNAL_ROWS);
-    TILE = Math.min(tileW, tileH);
+    TILE = Math.min(maxTileWidth, maxTileHeight);
     
     // Clamp TILE size so it doesn't get ridiculously tiny or huge
     if (TILE < 35) TILE = 35;
@@ -851,12 +856,12 @@ function resize() {
     ROWS = INTERNAL_ROWS;
 
     // 4. ALIGNMENT: Centers the shop and respects the sidewalk/road
-    offX = (canvas.width - (COLS * TILE)) / 2;
-    offY = Math.max(100, (canvas.height - (ROWS * TILE)) / 2 + 30);
+    offX = (canvas.width - COLS * TILE) / 2;
+    offY = (canvas.height - ROWS * TILE) / 2;
 
     // Global Door Position for AI and Collision
-    doorXStart = offX + TILE * 1;
-    doorXEnd = offX + TILE * 4;
+    doorXStart = offX + 2 * TILE;
+    doorXEnd = offX + 5 * TILE;
 
     // RE-ANCHOR DELIVERY CRATES
     if (gameState.deliveries) {
