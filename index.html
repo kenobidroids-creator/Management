@@ -847,9 +847,7 @@ function resize() {
     const tileH = Math.floor((canvas.height - 100) / INTERNAL_ROWS);
     TILE = Math.min(maxTileWidth, maxTileHeight);
     
-    // Clamp TILE size so it doesn't get ridiculously tiny or huge
-    if (TILE < 35) TILE = 35;
-    if (TILE > 60) TILE = 60;
+    
 
     // 3. SET THE GRID: These are now the fixed internal bounds
     COLS = INTERNAL_COLS;
