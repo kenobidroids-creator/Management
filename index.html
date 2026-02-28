@@ -168,7 +168,19 @@ let crateCost = 50;
 let gameState = {
     money: 500, moneyTexts: [], // Array to track floating +$5, +$10 labels
     mode: 'PLAY',
-    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50, path: [] },
+    player: { 
+        x: offX + (0 * TILE), 
+        y: offY + (5 * TILE), 
+        tX: offX + (0 * TILE), 
+        tY: offY + (5 * TILE), 
+        relX: 0.5, 
+        relY: 5, 
+        size: 15, 
+        angle: 0, 
+        speed: 200, 
+        holding: 0, 
+        maxHolding: 50, 
+        path: [] },
     counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
     shelves: [{ gridX: 7, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [],
@@ -754,7 +766,7 @@ function loadGame() {
         if (loaded.deliveries) gameState.deliveries = loaded.deliveries;
         if (loaded.player) {
             // Restore the basic stats
-            Object.assign(gameState.player, loaded.player);
+            //Object.assign(gameState.player, loaded.player);
             
             // If they have a saved relative position, snap them to it
             if (loaded.player.relX !== undefined) {
@@ -801,9 +813,6 @@ window.addEventListener('orientationchange', () => {
     setTimeout(() => { updateVH(); resize(); }, 100);
 });
 
-// Initial call
-updateVH();
-
 function resize() {
     const topBarH = document.getElementById('top-bar').offsetHeight;
     const bottomBarH = document.getElementById('bottom-bar').offsetHeight;
@@ -813,8 +822,15 @@ function resize() {
     const oldOffY = offY;
     const oldTile = TILE;
 
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight - (topBarH + bottomBarH);
+
+    // This is the magic formula:
+    // We add a '2' tile buffer so the shop isn't touching the very edge of the screen
+
 
     // FIX: Define a fixed internal room size so no one has a "larger" room
     const INTERNAL_COLS = 12;
@@ -955,7 +971,17 @@ function confirmPlacement() {
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
 function openModal() { document.getElementById('modal').style.display = 'block'; }
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scratcherSimData'); location.reload(); } }
+function resetGame() { 
+    if(confirm("Clear All?")) { 
+        localStorage.removeItem('scratcherSimData'); 
+
+        // Explicitly set the "New Game" spawn point
+        gameState.player.relX = 1; 
+        gameState.player.relY = 5;
+
+        location.reload(); 
+    } 
+}
 
 canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
 canvas.addEventListener('mousedown', (e) => {
@@ -1015,9 +1041,6 @@ canvas.addEventListener('mousedown', (e) => {
         }
     }
 });
-
-loadGame(); resize();
-requestAnimationFrame(loop);
 
 function triggerAction() {
     const p = gameState.player;
@@ -1337,6 +1360,16 @@ document.addEventListener("visibilitychange", () => {
 });
 
 let spawnInterval = setInterval(() => { if(gameState.customers.length < 8) console.log("Checking spawn timer..."); spawnCustomer(); }, 3500);
+
+// 1. Initial measurement
+updateVH(); 
+resize(); 
+
+// 2. Load the save data (This might load x:0, y:0 from an old save)
+loadGame(); 
+
+// 4. Start the loop
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
