@@ -5,22 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scratcher Sim</title>
     <style>
-        :root { --primary: #2196F3; --accent: #4CAF50; --danger: #f44336; --dark: #1a1a1a; }
-        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; touch-action: none; display: flex; justify-content: center; align-items: center; height: 110vh; }
-        #top-bar { position: absolute; top: 0; left: 0; right: 0; height: 50px; background: rgba(0,0,0,0.9); display: flex; justify-content: space-around; align-items: center; color: white; font-size: 13px; z-index: 10; border-bottom: 2px solid #444; }
-        #bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; gap: 15px; }
-        #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; pointer-events: auto; }
-        .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
-        .btn-confirm { background: var(--accent); }
-        .btn-cancel { background: var(--danger); }
-        .btn-build { background: #e91e63; }
+    :root { 
+        --primary: #2196F3; 
+        --accent: #4CAF50; 
+        --danger: #f44336; 
+        --dark: #1a1a1a;
+        /* Default vh if JS hasn't calculated it yet */
+        --vh: 1vh; 
+    }
+
+    * { box-sizing: border-box; }
+
+    body { 
+        margin: 0; 
+        /* Use the custom variable for height */
+        height: calc(var(--vh, 1vh) * 100);
+        overflow: hidden; 
+        background: #111; 
+        font-family: 'Segoe UI', sans-serif; 
+        touch-action: none; 
+        display: flex; 
+        flex-direction: column; /* Stack elements vertically */
+        -webkit-user-select: none;
+    }
+
+    #top-bar { 
+        height: 50px; 
+        background: rgba(0,0,0,0.9); 
+        display: flex; 
+        justify-content: space-around; 
+        align-items: center; 
+        color: white; 
+        font-size: 13px; 
+        border-bottom: 2px solid #444;
+        flex-shrink: 0; /* Don't let it squash */
+    }
+
+    #gameCanvas { 
+        flex-grow: 1; /* Take up all remaining space */
+        display: block; 
+        width: 100%;
+        background: #1a1a1a; 
+    }
+
+    #bottom-bar { 
+        height: 80px; /* Slightly shorter for mobile thumb reach */
+        background: rgba(0,0,0,0.8); 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        gap: 15px; 
+        flex-shrink: 0;
+        padding-bottom: env(safe-area-inset-bottom); /* iOS Notch support */
+    }
         #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
 
-        #scratcher-modal {
-        display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: #334155; padding: 20px; border-radius: 20px; z-index: 200;
-        box-shadow: 0 0 50px rgba(0,0,0,0.8); text-align: center;
+       #modal, #scratcher-modal {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        z-index: 200; width: 90%; max-width: 400px;
     }
+
+    /* Rest of your modal styles remain the same... */
+    #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; }
+    .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 70px; }
+    .btn-confirm { background: var(--accent); }
+    .btn-cancel { background: var(--danger); }
+    .btn-build { background: #e91e63; }
+    .btn-action { background: #ff9800; border: 2px solid white; }
+
     /* The container must be relative so the canvas can sit on top */
     #scratch-container { 
         position: relative; width: 280px; height: 280px; 
@@ -89,6 +141,7 @@ body { touch-action: none; -webkit-user-select: none; }
 <div id="bottom-bar">
     <button class="btn btn-build" id="build-toggle" onclick="toggleBuildMode()">BUILD</button>
     <button class="btn btn-action" id="action-btn" onclick="triggerAction()">ACTION</button>
+    <button id="btn-scratch" class="btn" style="display: none; background: var(--accent);">SCRATCH</button>
     <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
 </div>
 
@@ -103,13 +156,19 @@ let COLS = 15;
 let ROWS = 12;
 let offX = 0, offY = 0;
 
+let doorXStart = 0; 
+let doorXEnd = 0;
+
 let lastTime = 0;
 let transactionTimer = 0;
 let restockTimer = 0;
 
+let crateCost = 50;
+
 let gameState = {
-    money: 500, mode: 'PLAY',
-    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50 },
+    money: 500, moneyTexts: [], // Array to track floating +$5, +$10 labels
+    mode: 'PLAY',
+    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50, path: [] },
     counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
     shelves: [{ gridX: 7, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
     customers: [],
@@ -130,48 +189,96 @@ function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY
 function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
 
 function checkCollision(nx, ny, isAI = false) {
-    const doorMinX = offX + TILE * 1;
-    const doorMaxX = offX + TILE * 4;
-    const isAtDoor = (nx > doorMinX && nx < doorMaxX && ny < offY + 20 && ny > offY - 20);
-
-    if (!isAI && ny < offY) {
-        if (nx < 20 || nx > canvas.width - 20 || ny < offY - 80) return true;
+    const doorMargin = 5; // Extra wiggle room to get through the door
+    const isInDoorWidth = (nx > doorXStart + doorMargin && nx < doorXEnd - doorMargin);
+    
+    // 1. TOP WALL & DOOR LOGIC
+    // If we are on the sidewalk (above the shop)
+    if (ny < offY) {
+        // AI can move freely on the sidewalk to reach the door
+        if (isAI) return false; 
+        
+        // Player can move on sidewalk but not off-screen
+        if (nx < 0 || nx > canvas.width || ny < 0) return true;
+        
+        // Player can only ENTER the shop through the door
+        const isInDoor = (nx > doorXStart && nx < doorXEnd);
+        if (ny > offY - 10 && !isInDoor) return true; 
+        
+        // If NOT in door width, the top wall (offY) is solid
         return false; 
     }
 
-    if (!isAtDoor) {
-        if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || ny < offY + 15 || ny > offY + (ROWS * TILE) - 15) {
-            if (!isAI || ny > offY) return true;
-        }
+    // 2. BOTTOM & SIDE WALLS
+    // Stay inside offX, offX + Width, and offY + Height
+    if (nx < offX + 15 || nx > offX + (COLS * TILE) - 15 || 
+        ny > offY + (ROWS * TILE) - 15) {
+        return true;
     }
     
+    // 3. FURNITURE COLLISION
     let collision = false;
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return; 
         const r = getRect(obj);
-        if (nx + 12 > r.x && nx - 12 < r.x + r.w && ny + 12 > r.y && ny - 12 < r.y + r.h) collision = true;
+        if (nx + 12 > r.x && nx - 12 < r.x + r.w && ny + 12 > r.y && ny - 12 < r.y + r.h) {
+            collision = true;
+        }
     });
     return collision;
 }
 
 function buyStock() {
-    if (gameState.money >= 50) {
-        gameState.money -= 50;
-        gameState.deliveries.push({ x: offX + TILE * (1.5 + Math.random() * 2), y: offY - 40, qty: 50 });
+    if (gameState.money >= crateCost) {
+        gameState.money -= crateCost; 
+        // We calculate position relative to the shop's origin (offX)
+        // (1.5 + random) means it lands near the door
+        gameState.deliveries.push({ 
+            gX: 1.5 + Math.random() * 2, 
+            gY: -1.5, // On the sidewalk above the shop
+            qty: 50 
+        });
         saveGame();
     }
 }
 
 function spawnCustomer() {
     if (gameState.mode !== 'PLAY') return;
-    const side = Math.random() > 0.5 ? -150 : canvas.width + 150;
-    const doorX = offX + TILE * 2.5;
-    gameState.customers.push({
-        id: Math.random(), x: side, y: offY - 60, tX: doorX, tY: offY - 60,
-        speed: 80 + Math.random() * 40, state: 'WALKING', 
-        basket: 0, timer: 0, queueTime: Date.now(),
-        color: `hsl(${Math.random() * 360}, 65%, 60%)`
-    });
+
+    // Only limit the number of people INSIDE the shop (those with a SHOPPER intent)
+    const activeShoppers = gameState.customers.filter(c => c.intent === 'SHOPPER').length;
+    if (activeShoppers >= 8) return; 
+
+    const side = Math.random() > 0.5 ? -100 : canvas.width + 100;
+    const sidewalkY = offY - 40; 
+    
+    // DECISION LOGIC: 60% chance to be a shopper, 40% just walking by
+    const isShopper = Math.random() < 0.6;
+    const intent = isShopper ? 'SHOPPER' : 'PASSERBY';
+
+    // Shoppers target the door, Passerbys target the opposite side of the screen
+    const targetX = isShopper ? (doorXStart + doorXEnd) / 2 : (side < 0 ? canvas.width + 200 : -200);
+
+    const newCustomer = {
+        id: Math.random().toFixed(4), 
+        x: side, 
+        y: sidewalkY, 
+        tX: targetX, 
+        tY: sidewalkY, 
+        relX: ((doorXStart + doorXEnd) / 2 - offX) / TILE,
+        relY: (offY - 20 - offY) / TILE,
+        intent: intent, // Store the intent
+        speed: 70 + Math.random() * 30, 
+        state: 'WALKING', 
+        basket: 0, 
+        timer: 0, 
+        queueTime: Date.now(),
+        color: isShopper ? `hsl(${Math.random() * 360}, 65%, 60%)` : '#888' // Gray out non-shoppers?
+    };
+
+    gameState.customers.push(newCustomer);
+    saveGame();
+    console.log(`Customer ${newCustomer.id} spawned at X:${side}. Targeting Door X:${targetX}`);
 }
 
 function updateCustomers(dt) {
@@ -183,76 +290,146 @@ function updateCustomers(dt) {
         .filter(c => c.state === 'TO_SHELF' || c.state === 'PICKING')
         .sort((a,b) => a.queueTime - b.queueTime);
 
+    // 1. Define who is in the payment line
     const payQueue = gameState.customers
         .filter(c => c.state === 'WAITING')
-        .sort((a,b) => a.queueTime - b.queueTime);
+        .sort((a, b) => a.queueTime - b.queueTime);
     
+    // 2. Define the player interaction zone (the red dotted box area)
     const regZone = {
         x: offX + (gameState.counter.gridX - 1) * TILE,
         y: offY + gameState.counter.gridY * TILE,
         w: TILE, h: gameState.counter.h * TILE
     };
 
+    // 3. Process the transaction
     if (payQueue.length > 0 && isInZone(gameState.player.x, gameState.player.y, regZone)) {
         const firstC = payQueue[0];
-        if (Math.abs(firstC.x - firstC.tX) < 20) {
+        
+        // Ensure the customer has actually reached their destination at the counter
+        const distToCounter = Math.hypot(firstC.x - firstC.tX, firstC.y - firstC.tY);
+        
+        if (distToCounter < 30) {
             transactionTimer += dt;
+            
             if (transactionTimer >= 1.5) {
-                gameState.money += firstC.basket * 10;
-                firstC.basket = 0; firstC.state = 'LEAVING';
-                firstC.tX = offX + TILE * 2.5; firstC.tY = offY - 10;
-                transactionTimer = 0; saveGame();
+                const earnings = firstC.basket * 10;
+                gameState.money += earnings;
+
+                // Floating Money Text
+                if (!gameState.moneyTexts) gameState.moneyTexts = [];
+                gameState.moneyTexts.push({
+                    x: gameState.player.x,
+                    y: gameState.player.y - 20,
+                    val: `+$${earnings}`,
+                    life: 1.0,
+                    opacity: 1.0
+                });
+
+                firstC.basket = 0; 
+                firstC.state = 'LEAVING';
+                transactionTimer = 0; 
+                saveGame();
             }
         }
-    } else { transactionTimer = 0; }
+    } else {
+        transactionTimer = 0; // Reset if player walks away
+        // Reset state to WAITING if the player walks away before finishing
+        payQueue.forEach(c => { if(c.state === 'PAYING') c.state = 'WAITING'; });
+    }
 
     gameState.customers.forEach((c, index) => {
         if (c.state === 'WALKING') {
-            if (Math.abs(c.x - c.tX) < 10) { c.state = 'ENTERING'; c.tY = offY + TILE * 1.5; }
-        } 
-        else if (c.state === 'ENTERING' && Math.abs(c.y - c.tY) < 10) {
-            c.state = 'TO_SHELF';
-            c.queueTime = Date.now();
-        } 
-        else if (c.state === 'TO_SHELF') {
-    const pos = shelfQueue.indexOf(c);
-    const targetShelf = gameState.shelves[0]; // Targets the first shelf
-    
-    // Dynamic standing spot: 1 tile to the left of the shelf, aligned with the top of it
-    // Then adds a 35px gap for each person in line behind the first
-    c.tX = offX + (targetShelf.gridX - 1) * TILE + 20;
-    c.tY = offY + (targetShelf.gridY * TILE) + 20 + (pos * 35);
-    
-    // Only the person at index 0 (front of line) can start picking
-    if (pos === 0 && Math.abs(c.x - c.tX) < 10 && Math.abs(c.y - c.tY) < 10) {
-        c.state = 'PICKING'; 
-        c.timer = 1.0 + Math.random();
+    // Only transition to 'ENTERING' if they intended to shop
+    if (c.intent === 'SHOPPER' && Math.abs(c.x - c.tX) < 10) { 
+        c.state = 'ENTERING'; 
+        c.tY = offY + TILE * 1.5; 
+    } 
+    // If they are a PASSERBY and reached the other side, remove them
+    else if (c.intent === 'PASSERBY' && Math.abs(c.x - c.tX) < 20) {
+        const index = gameState.customers.indexOf(c);
+        gameState.customers.splice(index, 1);
+    }
+}
+        else if (c.state === 'ENTERING') {
+    // Once they pass the door threshold, head to the shelves
+    if (c.y > offY + 10) {
+        c.state = 'TO_SHELF';
+        c.queueTime = Date.now();
     }
 } 
+        else if (c.state === 'TO_SHELF') {
+            const shelf = gameState.shelves[0];
+            // Get everyone currently in the shelf line
+            const shelfQueue = gameState.customers
+                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
+                .sort((a, b) => a.queueTime - b.queueTime); // Sort by who arrived first
+            
+            const pos = shelfQueue.indexOf(c);
+
+            // Target the floor tile in front of the shelf
+            c.tX = offX + (shelf.gridX - 0.8) * TILE; // customer distance to shelf
+            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35); // queue distance
+
+            const dist = Math.hypot(c.x - c.tX, c.y - c.tY);
+            
+            // CRITICAL: Only index 0 can pick. This prevents cutting.
+            if (pos === 0 && dist < 20) {
+                c.state = 'PICKING';
+                c.timer = 1.5;
+            }
+        }
         else if (c.state === 'PICKING') {
             c.timer -= dt;
             if (c.timer <= 0) {
                 const s = gameState.shelves[0];
-                const grab = Math.random() < 0.9 ? Math.min(s.stock, Math.floor(Math.random() * 3) + 1) : 0;
-                if (grab > 0) {
-                    s.stock -= grab; c.basket = grab;
-                    c.state = 'WAITING'; c.queueTime = Date.now();
-                    saveGame();
+                if (s.stock > 0) {
+                    // Success: Customer finds tickets
+                    const grab = Math.min(s.stock, Math.floor(Math.random() * 3) + 1);
+                    s.stock -= grab;
+                    c.basket = grab;
+                    c.state = 'WAITING';
+                    c.queueTime = Date.now();
                 } else {
-                    c.state = 'LEAVING';
-                    c.tX = offX + TILE * 2.5; c.tY = offY + TILE;
+                    // Failure: No tickets left!
+                    c.state = 'ANGRY'; // New state
+                    c.timer = 2.0;    // Stay angry for 2 seconds before leaving
                 }
+                saveGame();
+            }
+        }
+        else if (c.state === 'ANGRY') {
+            c.timer -= dt;
+            // Target the door to leave
+            c.tX = (doorXStart + doorXEnd) / 2;
+            c.tY = offY - 20;
+
+            if (c.timer <= 0) {
+                c.state = 'LEAVING';
             }
         } 
         else if (c.state === 'WAITING') {
-            const pos = payQueue.indexOf(c);
-            c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 35 + (pos * 45);
-            c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
-        } 
+    // ONLY people currently waiting for the register
+    const payQueue = gameState.customers
+        .filter(cust => cust.state === 'WAITING')
+        .sort((a, b) => a.queueTime - b.queueTime);
+    
+    const pos = payQueue.indexOf(c);
+    // Line up horizontally to the right of the counter
+    c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 20 + (pos * 40);
+    c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
+} 
         else if (c.state === 'LEAVING') {
-            if (c.y > offY - 30) { c.tX = offX + TILE * 2.5; c.tY = offY - 60; }
-            else { c.tX = (c.id > 0.5) ? -300 : canvas.width + 300; }
-        }
+    if (c.y > offY - 10) { 
+        // Move to door center first
+        c.tX = (doorXStart + doorXEnd) / 2; 
+        c.tY = offY - 40; 
+    } else { 
+        // Head off-screen once on sidewalk
+        c.tX = (c.id > 0.5) ? -200 : canvas.width + 200; 
+        c.tY = offY - 40;
+    }
+}
 
         let dx = c.tX - c.x, dy = c.tY - c.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
@@ -260,9 +437,12 @@ function updateCustomers(dt) {
             let vx = (dx/dist) * c.speed * dt, vy = (dy/dist) * c.speed * dt;
             if (!checkCollision(c.x + vx, c.y, true)) c.x += vx;
             if (!checkCollision(c.x, c.y + vy, true)) c.y += vy;
+
+            c.relX = (c.x - offX) / TILE;
+            c.relY = (c.y - offY) / TILE;
         }
 
-        if ((c.x < -250 || c.x > canvas.width + 250) && c.state === 'LEAVING') {
+        if ((c.x < -150 || c.x > canvas.width + 150) && c.state === 'LEAVING') {
             gameState.customers.splice(index, 1);
         }
     });
@@ -271,13 +451,39 @@ function updateCustomers(dt) {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     let p = gameState.player;
-    
+
     // Environment
-    ctx.fillStyle = "#333"; ctx.fillRect(0, 0, canvas.width, offY - 80); 
-    ctx.fillStyle = "#555"; ctx.fillRect(0, offY - 80, canvas.width, 80); 
+    // Road: From top of screen down to the sidewalk
+    ctx.fillStyle = "#333"; 
+    ctx.fillRect(0, 0, canvas.width, offY - 80); 
+
+    // Sidewalk: The 80px strip right above the shop walls
+    ctx.fillStyle = "#555"; 
+    ctx.fillRect(0, offY - 80, canvas.width, 80); 
+
+    // Sidewalk Lines (Cracks)
     ctx.strokeStyle = "#444";
-    for(let i=0; i<canvas.width; i+=100) { ctx.beginPath(); ctx.moveTo(i, offY-80); ctx.lineTo(i, offY); ctx.stroke(); }
-    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX, offY, COLS*TILE, ROWS*TILE);
+    ctx.lineWidth = 2;
+    for(let i=0; i < canvas.width; i += 100) { 
+        ctx.beginPath(); 
+        ctx.moveTo(i, offY - 80); 
+        ctx.lineTo(i, offY); 
+        ctx.stroke(); 
+    }
+    
+   // Draw the Floor (Centered Grid)
+    ctx.fillStyle = "#1e1e1e"; 
+    ctx.fillRect(offX, offY, COLS * TILE, ROWS * TILE);
+
+    // Draw Dynamic Walls (White Border)
+    ctx.strokeStyle = "white"; 
+    ctx.lineWidth = 4; 
+    ctx.strokeRect(offX, offY, COLS * TILE, ROWS * TILE);
+
+    // Draw the Entrance (Doorway)
+    // This stays relative to the top-left of your dynamic room
+    ctx.fillStyle = "#1e1e1e"; 
+    ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
     
     if (gameState.mode === 'BUILD') {
         ctx.strokeStyle = "#333";
@@ -285,25 +491,62 @@ function draw() {
         for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(offX, offY+j*TILE); ctx.lineTo(offX+COLS*TILE, offY+j*TILE); ctx.stroke(); }
     }
 
-    // PERMANENT RED DOTTED HITBOX
-    ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(255, 0, 0, 0.7)"; ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); ctx.lineWidth = 2;
     ctx.strokeRect(offX + (gameState.counter.gridX - 1) * TILE + 5, offY + gameState.counter.gridY * TILE + 5, TILE - 10, (gameState.counter.h * TILE) - 10);
+    // DYNAMIC RED DOTTED HITBOX
+    // 1. Determine the zone position (following the counter)
+    let rx, ry;
+    if (gameState.movingObj === gameState.counter && !gameState.isPlaced) {
+        rx = offX + (Math.floor((gameState.mouse.x - offX) / TILE) - 1) * TILE;
+        ry = offY + Math.floor((gameState.mouse.y - offY) / TILE) * TILE;
+    } else if (gameState.movingObj === gameState.counter && gameState.isPlaced) {
+        rx = offX + (gameState.tempPos.gX - 1) * TILE;
+        ry = offY + gameState.tempPos.gY * TILE;
+    } else {
+        rx = offX + (gameState.counter.gridX - 1) * TILE;
+        ry = offY + gameState.counter.gridY * TILE;
+    }
+
+    // 2. Define the collision area for the player
+    const rw = TILE;
+    const rh = gameState.counter.h * TILE;
+
+    // 3. Check if player is inside
+    const isPlayerInside = (gameState.player.x > rx && gameState.player.x < rx + rw && 
+                            gameState.player.y > ry && gameState.player.y < ry + rh);
+
+    // 4. Set color: Green if player is inside, Red otherwise
+    ctx.strokeStyle = isPlayerInside ? "rgba(76, 175, 80, 0.9)" : "rgba(255, 0, 0, 0.7)"; 
+    
+    ctx.strokeRect(rx + 5, ry + 5, rw - 10, rh - 10);
+    if (isPlayerInside) {
+        ctx.fillStyle = "rgba(76, 175, 80, 0.1)";
+        ctx.fillRect(rx + 5, ry + 5, rw - 10, rh - 10);
+    }
     ctx.setLineDash([]);
 
     ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(offX, offY, COLS*TILE, ROWS*TILE);
     ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
 
     gameState.deliveries.forEach(d => {
-    // Draw the box
-    ctx.fillStyle = "#d2b48c"; ctx.fillRect(d.x - 10, d.y - 10, 20, 20);
-    ctx.strokeStyle = "#8b4513"; ctx.strokeRect(d.x - 10, d.y - 10, 20, 20);
-    
-    // NEW: Draw the quantity text overlay
-    ctx.fillStyle = "white"; 
-    ctx.font = "bold 10px Arial"; 
-    ctx.textAlign = "center";
-    ctx.fillText(d.qty, d.x, d.y + 4); 
-});
+        // Calculate current screen pixels based on the grid
+        const drawX = offX + (d.gX * TILE);
+        const drawY = offY + (d.gY * TILE);
+        //const size = TILE * 0.8;
+        const fixedSize = 30;
+
+        // Draw the box
+        ctx.fillStyle = "#d2b48c"; 
+        ctx.fillRect(drawX, drawY, fixedSize, fixedSize);
+        ctx.strokeStyle = "#8b4513"; 
+        ctx.strokeRect(drawX, drawY, fixedSize, fixedSize);
+        
+        // Quantity text overlay
+        ctx.fillStyle = "white"; 
+        ctx.font = "bold 10px Arial"; 
+        ctx.textAlign = "center";
+        ctx.fillText(d.qty, drawX + fixedSize/2, drawY + fixedSize/2 + 4); 
+    });
 
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return;
@@ -313,6 +556,13 @@ function draw() {
             ctx.fillText(`STOCK: ${obj.stock}`, offX + obj.gridX * TILE, offY + obj.gridY * TILE - 5);
         }
     });
+
+    // Near where shelves are drawn
+        if (gameState.shelves[0].stock <= 0) {
+            ctx.fillStyle = "white";
+            ctx.font = "bold 10px Arial";
+            ctx.fillText("OUT OF STOCK", offX + (gameState.shelves[0].gridX + 1) * TILE, offY + (gameState.shelves[0].gridY + 1) * TILE);
+        }
 
     if (gameState.movingObj) {
         let gx = gameState.isPlaced ? gameState.tempPos.gX : Math.floor((gameState.mouse.x - offX) / TILE);
@@ -325,38 +575,76 @@ function draw() {
         ctx.globalAlpha = 1.0;
     }
 
-    gameState.customers.forEach(c => {
-        ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(c.x, c.y, 14, 0, Math.PI*2); ctx.fill();
-        if (c.basket > 0) { ctx.fillStyle = "white"; ctx.font = "bold 12px Arial"; ctx.textAlign = "center"; ctx.fillText(c.basket, c.x, c.y + 4); }
-    });
-
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
     ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
     ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(7,0,4,0,Math.PI*2); ctx.fill();
     ctx.restore();
     if (p.holding > 0) { 
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.angle);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
     
-    // Draw the held box
-    ctx.fillStyle = "#d2b48c"; 
-    ctx.fillRect(10, -8, 16, 16); 
-    ctx.strokeStyle = "#8b4513";
-    ctx.strokeRect(10, -8, 16, 16);
+        // Draw the held box
+        ctx.fillStyle = "#d2b48c"; 
+        ctx.fillRect(10, -8, 16, 16); 
+        ctx.strokeStyle = "#8b4513";
+        ctx.strokeRect(10, -8, 16, 16);
     
-    // Draw the number, but un-rotate it so it stays upright
-    ctx.rotate(-p.angle); 
-    ctx.fillStyle = "white";
-    ctx.font = "bold 10px Arial";
-    ctx.textAlign = "center";
-    // We adjust the X/Y slightly because we are still in the player's translated space
-    const textX = Math.cos(p.angle) * 18;
-    const textY = Math.sin(p.angle) * 18 + 4;
-    ctx.fillText(p.holding, textX, textY);
-    
-    ctx.restore();
-}
+        // Draw the number, but un-rotate it so it stays upright
+        ctx.rotate(-p.angle); 
+        ctx.fillStyle = "white";
+        ctx.font = "bold 10px Arial";
+        ctx.textAlign = "center";
+        // We adjust the X/Y slightly because we are still in the player's translated space
+        const textX = Math.cos(p.angle) * 18;
+        const textY = Math.sin(p.angle) * 18 + 4;
+        ctx.fillText(p.holding, textX, textY);
+
+        ctx.restore();
+    } // end of holding box
+
+// 4. DRAW CUSTOMERS (Must be after environment)
+    gameState.customers.forEach(c => {
+        ctx.fillStyle = c.color; 
+        ctx.beginPath(); 
+        ctx.arc(c.x, c.y, 14, 0, Math.PI*2); 
+        ctx.fill();
+
+        // Floating Emotes
+        let emote = "";
+        if (c.state === 'TO_SHELF' || c.state === 'PICKING') emote = "🛒";
+        if (c.state === 'WAITING' || c.state === 'PAYING') emote = "💰";
+        if (c.state === 'LEAVING') emote = "👋";
+        if (c.state === 'ANGRY') emote = "😡"; 
+
+        if (emote) {
+            ctx.font = "18px Arial";
+            ctx.textAlign = "center";
+            // Add a frantic shake if they are angry
+            const shake = (c.state === 'ANGRY') ? Math.sin(Date.now() * 0.05) * 3 : 0;
+            ctx.fillText(emote, c.x + shake, c.y - 30);
+        }
+
+        // Draw Quantity inside body
+        if (c.basket > 0) {
+            ctx.fillStyle = "white";
+            ctx.font = "bold 12px Arial";
+            ctx.fillText(`x${c.basket}`, c.x, c.y + 5);
+        }
+    });
+
+    // Draw Customer Path Targets
+    //gameState.customers.forEach(c => {
+    //    ctx.strokeStyle = "yellow";
+    //    ctx.beginPath();
+    //    ctx.moveTo(c.x, c.y);
+    //    ctx.lineTo(c.tX, c.tY);
+    //    ctx.stroke();
+    //
+    //    ctx.fillStyle = "white";
+    //    ctx.font = "10px Arial";
+    //   ctx.fillText(c.state, c.x, c.y - 20);
+    // });
 
     if (transactionTimer > 0) {
         ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(p.x - 20, p.y - 30, 40, 6);
@@ -365,16 +653,37 @@ function draw() {
     
     document.getElementById('ui-cash').innerText = `$${gameState.money}`;
     document.getElementById('ui-held').innerText = p.holding;
+
+    // Draw Floating Money Labels
+    gameState.moneyTexts.forEach(mt => {
+        ctx.globalAlpha = mt.opacity;
+        ctx.fillStyle = "#4CAF50";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(mt.val, mt.x, mt.y);
+        ctx.globalAlpha = 1.0;
+    });
 }
 
 function loop(timestamp) {
     let dt = (timestamp - lastTime) / 1000;
     if (dt > 0.1) dt = 0.1; lastTime = timestamp;
 
-    if (scratchCooldown > 0) scratchCooldown -= dt; // Count down the timer
+    if (scratchCooldown > 0) scratchCooldown -= dt; 
 
     let p = gameState.player;
     if (gameState.mode === 'PLAY') {
+        // Pathfinding movement
+        if (p.path && p.path.length > 0) {
+            const nextTile = p.path[0];
+            p.tX = offX + (nextTile.x + 0.5) * TILE;
+            p.tY = offY + (nextTile.y + 0.5) * TILE;
+
+            const dist = Math.hypot(p.x - p.tX, p.y - p.tY);
+            if (dist < 5) p.path.shift(); 
+        }
+        
+        // standard movement
         let dx = p.tX - p.x, dy = p.tY - p.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
         if (dist > 5) {
@@ -382,9 +691,12 @@ function loop(timestamp) {
             if (!checkCollision(p.x + vx, p.y)) p.x += vx;
             if (!checkCollision(p.x, p.y + vy)) p.y += vy;
             p.angle = Math.atan2(dy, dx);
+
+            p.relX = (p.x - offX) / TILE;
+            p.relY = (p.y - offY) / TILE;
         }
         
-        // 2. NEW INTERACTION SECTION (FROM THE PHOTO)
+        // Interaction Logic (Shelves/Restocking)
         const s = gameState.shelves[0];
         const shelfZone = { 
             x: offX + (s.gridX - 1) * TILE, 
@@ -394,51 +706,252 @@ function loop(timestamp) {
         };
 
         if (isInZone(p.x, p.y, shelfZone)) {
+            const scratchBtn = document.getElementById('btn-scratch');
             if (p.holding > 0) {
-                // If holding a box, restock the shelf
                 restockTimer += dt;
+                scratchBtn.style.display = 'none';
                 if (restockTimer > 0.05 && s.stock < s.max) {
                     s.stock++; 
                     p.holding--; 
                     restockTimer = 0;
                     if (p.holding === 0 || s.stock >= s.max) saveGame();
                 }
-            } else if (s.stock > 0 && !scratchActive && scratchCooldown <= 0) {
-                // OPEN SCRATCHER WITH COOLDOWN
-                s.stock--;
-                scratchCooldown = 5.0; // Wait 5 seconds before another card is allowed
-                openScratcher();
-                saveGame();
+            } else if (s.stock > 0 && !scratchActive) {
+                scratchBtn.style.display = 'block';
+            } else {
+                scratchBtn.style.display = 'none';
             }
+        } else {
+            document.getElementById('btn-scratch').style.display = 'none';
         }
+    } 
+
+    // Update Floating Money Texts
+    for (let i = gameState.moneyTexts.length - 1; i >= 0; i--) {
+        let mt = gameState.moneyTexts[i];
+        mt.y -= 40 * dt;    
+        mt.life -= dt;      
+        mt.opacity = mt.life;
+        if (mt.life <= 0) gameState.moneyTexts.splice(i, 1);
     }
-    updateCustomers(dt); draw();
-    requestAnimationFrame(loop);
-}
+
+    updateCustomers(dt); 
+    draw();
+    requestAnimationFrame(loop); 
+} 
 
 // Utility and Handlers
-setInterval(() => { if(gameState.customers.length < 8) spawnCustomer(); }, 3500);
-function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
-function loadGame() { const saved = localStorage.getItem('scratcherSimData'); if (saved) { const loaded = JSON.parse(saved); gameState.money = loaded.money ?? 500; if (loaded.counter) gameState.counter = loaded.counter; if (loaded.shelves) gameState.shelves = loaded.shelves; if (loaded.deliveries) gameState.deliveries = loaded.deliveries; } }
-// UPDATED RESIZE FOR VERTICAL PORTRAIT
-function resize() { 
-    canvas.width = window.innerWidth; 
-    canvas.height = window.innerHeight; 
-    TILE = Math.floor(canvas.width / COLS);
-    ROWS = Math.floor((canvas.height - 150) / TILE); 
-    // Center the grid horizontally
-    offX = (canvas.width - (COLS * TILE)) / 2; 
-    // Position the grid below the top bar and leave room for the bottom bar
-    offY = 60; 
-    const availableHeight = canvas.height - 180; // Leaving space for UI
-    ROWS = Math.floor(availableHeight / TILE); 
-    gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE; 
-    gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE; 
-    gameState.player.tX = gameState.player.x; 
-    gameState.player.tY = gameState.player.y; 
+function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, customers: gameState.customers, player: gameState.player, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
+function loadGame() {
+    const saved = localStorage.getItem('scratcherSimData');
+    if (saved) {
+        const loaded = JSON.parse(saved);
+        
+        // Restore basic stats
+        gameState.money = loaded.money ?? 500;
+        if (loaded.counter) gameState.counter = loaded.counter;
+        if (loaded.shelves) gameState.shelves = loaded.shelves;
+        if (loaded.deliveries) gameState.deliveries = loaded.deliveries;
+        if (loaded.player) {
+            // Restore the basic stats
+            Object.assign(gameState.player, loaded.player);
+            
+            // If they have a saved relative position, snap them to it
+            if (loaded.player.relX !== undefined) {
+                gameState.player.x = offX + (loaded.player.relX * TILE);
+                gameState.player.y = offY + (loaded.player.relY * TILE);
+                gameState.player.tX = gameState.player.x;
+                gameState.player.tY = gameState.player.y;
+            }
+        }
+
+        // RESTORE CUSTOMERS
+        if (loaded.customers) {
+            gameState.customers = loaded.customers.map(c => {
+                // Re-calculate screen X/Y based on the saved relative grid position
+                // This prevents them from being 'stuck' if you resized the window
+                c.x = offX + (c.relX * TILE);
+                c.y = offY + (c.relY * TILE);
+                
+                // Ensure they have a queueTime so the line order doesn't break
+                if (!c.queueTime) c.queueTime = Date.now();
+                
+                return c;
+            });
+        }
+    }
 }
+        if (gameState.customers) {
+            gameState.customers.forEach(c => {
+                if (!c.queueTime) c.queueTime = Date.now();
+            });
+        }
+// UPDATED RESIZE FOR VERTICAL PORTRAIT
+// 1. Fix for Mobile Viewport Height
+function updateVH() {
+    let vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+window.addEventListener('resize', () => {
+    updateVH();
+    resize();
+});
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => { updateVH(); resize(); }, 100);
+});
+
+// Initial call
+updateVH();
+
+function resize() {
+    const topBarH = document.getElementById('top-bar').offsetHeight;
+    const bottomBarH = document.getElementById('bottom-bar').offsetHeight;
+    
+    // CAPTURE OLD VALUES FIRST
+    const oldOffX = offX;
+    const oldOffY = offY;
+    const oldTile = TILE;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - (topBarH + bottomBarH);
+
+    // FIX: Define a fixed internal room size so no one has a "larger" room
+    const INTERNAL_COLS = 15;
+    const INTERNAL_ROWS = 12
+
+    // 2. NEW RELATIVE CALCULATION: 
+    // This makes sure 15 columns and 12 rows ALWAYS fit the screen.
+    const tileW = Math.floor(canvas.width / (INTERNAL_COLS + 2)); 
+    const tileH = Math.floor((canvas.height - 100) / INTERNAL_ROWS);
+    TILE = Math.min(tileW, tileH);
+    
+    // Clamp TILE size so it doesn't get ridiculously tiny or huge
+    if (TILE < 35) TILE = 35;
+    if (TILE > 60) TILE = 60;
+
+    // 3. SET THE GRID: These are now the fixed internal bounds
+    COLS = INTERNAL_COLS;
+    ROWS = INTERNAL_ROWS;
+
+    // 4. ALIGNMENT: Centers the shop and respects the sidewalk/road
+    offX = (canvas.width - (COLS * TILE)) / 2;
+    offY = Math.max(100, (canvas.height - (ROWS * TILE)) / 2 + 30);
+
+    // Global Door Position for AI and Collision
+    doorXStart = offX + TILE * 1;
+    doorXEnd = offX + TILE * 4;
+
+    // RE-ANCHOR DELIVERY CRATES
+    if (gameState.deliveries) {
+        gameState.deliveries.forEach(crate => {
+            // 1. Calculate how many TILEs away from the OLD origin it was
+            const relX = (crate.x - oldOffX) / oldTile;
+            const relY = (crate.y - oldOffY) / oldTile;
+
+            // 2. Snap to the NEW pixel position based on the new origin and TILE size
+            crate.x = offX + (relX * TILE);
+            crate.y = offY + (relY * TILE);
+            
+            // 3. Update the crate's internal "size" so it scales visually
+            // (Assuming your crates use a standard TILE-based width/height)
+            crate.w = TILE * 0.8; 
+            crate.h = TILE * 0.8;
+        });
+    }
+
+    // 6. NEW BOUNDARY PROTECTION: 
+    // If the window shrank, push the furniture back inside the wall
+    [gameState.counter, ...gameState.shelves].forEach(obj => {
+        if (obj.gridX + obj.w > COLS) obj.gridX = COLS - obj.w;
+        if (obj.gridY + obj.h > ROWS) obj.gridY = ROWS - obj.h;
+    });
+
+    // Reset player position behind counter
+    //gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE;
+    //gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE;
+    //gameState.player.tX = gameState.player.x;
+    //gameState.player.tY = gameState.player.y;
+
+    // This keeps the player on the same TILE they were standing on before the resize
+    if (gameState.player.relX !== undefined) {
+        gameState.player.x = offX + (gameState.player.relX * TILE);
+        gameState.player.y = offY + (gameState.player.relY * TILE);
+        gameState.player.tX = gameState.player.x;
+        gameState.player.tY = gameState.player.y;
+    }
+
+    // RE-SYNC CUSTOMER TARGETS
+    gameState.customers.forEach(c => {
+        // If they were heading to the door, update the door coordinates
+        if (c.state === 'WALKING' || c.state === 'LEAVING') {
+            c.tX = (doorXStart + doorXEnd) / 2;
+            c.tY = offY - 20; 
+        } 
+        // If they were in line at the shelf, recalculate their spot
+        else if (c.state === 'TO_SHELF' || c.state === 'PICKING') {
+            const shelf = gameState.shelves[0];
+            const shelfQueue = gameState.customers
+                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
+                .sort((a, b) => a.queueTime - b.queueTime);
+            const pos = shelfQueue.indexOf(c);
+            
+            c.tX = offX + (shelf.gridX - 0.8) * TILE;
+            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
+        }
+        // If they were waiting at the counter, recalculate the line
+        else if (c.state === 'WAITING') {
+            const payQueue = gameState.customers
+                .filter(cust => cust.state === 'WAITING')
+                .sort((a, b) => a.queueTime - b.queueTime);
+            const pos = payQueue.indexOf(c);
+            
+            c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 20 + (pos * 40);
+            c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
+        }
+
+        // 1. CONVERT PIXELS TO RELATIVE GRID POSITION (Before offX/offY change)
+        // Note: We do this by capturing how many TILEs they were from the old origin
+        const relX = (c.x - oldOffX) / oldTile;
+        const relY = (c.y - oldOffY) / oldTile;
+
+        // 2. RE-POSITION TO NEW PIXEL COORDINATES
+        c.x = offX + (relX * TILE);
+        c.y = offY + (relY * TILE);
+
+        // 3. RE-SYNC TARGETS (The destination they are walking toward)
+        if (c.state === 'WALKING' || c.state === 'LEAVING') {
+            c.tX = (doorXStart + doorXEnd) / 2;
+            c.tY = offY - 20;
+        } else if (c.state === 'TO_SHELF' || c.state === 'PICKING') {
+            const shelf = gameState.shelves[0];
+            const shelfQueue = gameState.customers
+                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
+                .sort((a, b) => a.queueTime - b.queueTime);
+            const pos = shelfQueue.indexOf(c);
+            c.tX = offX + (shelf.gridX - 0.8) * TILE;
+            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
+        } else if (c.state === 'WAITING') {
+            const payQueue = gameState.customers
+                .filter(cust => cust.state === 'WAITING')
+                .sort((a, b) => a.queueTime - b.queueTime);
+            const pos = payQueue.indexOf(c);
+            c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 20 + (pos * 40);
+            c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
+        }
+    });
+}
+
 function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
-function confirmPlacement() { if(gameState.movingObj){ gameState.movingObj.gridX = gameState.tempPos.gX; gameState.movingObj.gridY = gameState.tempPos.gY; } clearBuildState(); saveGame(); }
+function confirmPlacement() { 
+    if(gameState.movingObj){ 
+        // Ensure the object stays within the defined 15x12 grid
+        gameState.movingObj.gridX = Math.max(0, Math.min(gameState.tempPos.gX, COLS - gameState.movingObj.w)); 
+        gameState.movingObj.gridY = Math.max(0, Math.min(gameState.tempPos.gY, ROWS - gameState.movingObj.h)); 
+    } 
+    clearBuildState(); 
+    saveGame(); 
+}
 function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
 function openModal() { document.getElementById('modal').style.display = 'block'; }
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -451,8 +964,30 @@ canvas.addEventListener('mousedown', (e) => {
     const my = e.clientY - rect.top;
     const gX = Math.floor((mx - offX) / TILE);
     const gY = Math.floor((my - offY) / TILE);
-    
+
     const p = gameState.player; // Fixes the 'p is not defined' error
+
+    if (gameState.mode === 'PLAY') {
+        // Calculate the Counter's interaction zone (Red Box)
+        const rx = gameState.counter.gridX - 1;
+        const ry = gameState.counter.gridY;
+        
+        if (gX === rx && gY >= ry && gY < ry + gameState.counter.h) {
+            // Clicked the Red Box! Find path.
+            const startG = { 
+                x: Math.floor((p.x - offX) / TILE), 
+                y: Math.floor((p.y - offY) / TILE) 
+            };
+            const targetG = { x: gX, y: gY };
+            p.path = findPath(startG, targetG);
+        } else {
+            // Manual click movement
+            p.path = []; // Cancel current path
+            p.tX = mx; 
+            p.tY = my; 
+        }
+    }
+    
 
     // 1. DROP BOX LOGIC (Right-Click only)
     if (e.button === 2) { 
@@ -489,7 +1024,12 @@ function triggerAction() {
     
     // 1. DROP LOGIC: If holding something, drop it at player's feet
     if (p.holding > 0) {
-        gameState.deliveries.push({ x: p.x, y: p.y, qty: p.holding });
+        // Convert current pixel spot back to grid for dropping
+        gameState.deliveries.push({ 
+            gX: (p.x - offX) / TILE, 
+            gY: (p.y - offY) / TILE, 
+            qty: p.holding 
+        });
         p.holding = 0;
         saveGame();
         return;
@@ -498,12 +1038,14 @@ function triggerAction() {
     // 2. PICKUP LOGIC: Look for boxes near the player
     let pickedUp = false;
     gameState.deliveries.forEach((d, i) => {
-        if (pickedUp) return; // Only pick up one box at a time
+        if (pickedUp) return;
         
-        const dist = Math.hypot(p.x - d.x, p.y - d.y);
+        // Calculate where the box is in pixels right now
+        const crateX = offX + (d.gX * TILE);
+        const crateY = offY + (d.gY * TILE);
+        const dist = Math.hypot(p.x - crateX, p.y - crateY);
         
-        // Short proximity check: Must be within 50 pixels
-        if (dist < 50 && p.holding < p.maxHolding) {
+        if (dist < TILE && p.holding < p.maxHolding) {
             let space = p.maxHolding - p.holding;
             let take = Math.min(d.qty, space);
             p.holding += take;
@@ -518,6 +1060,7 @@ function triggerAction() {
 
 function openScratcher() {
     scratchActive = true;
+    document.getElementById('btn-scratch').style.display = 'none';
     document.getElementById('scratcher-modal').style.display = 'block';
     
     // 1. Clear previous symbols and generate new ones
@@ -581,6 +1124,7 @@ function handleScratch(e) {
 }
 
 function checkScratchWin() {
+    const s = gameState.shelves[0];
     const data = sCtx.getImageData(0,0,280,280).data;
     let trans = 0;
     for(let i=3; i<data.length; i+=4) if(data[i] === 0) trans++;
@@ -588,7 +1132,7 @@ function checkScratchWin() {
     // Threshold: 60% revealed
     if ((trans / (280*280)) > 0.60) {
         scratchActive = false; // Prevent further scratching
-        
+        s.stock--;
         setTimeout(() => {
             if (currentPendingWin > 0) {
                 gameState.money += currentPendingWin;
@@ -618,6 +1162,66 @@ function getTouchPos(e) {
         y: touch.clientY - rect.top
     };
 }
+
+//1. The A* Pathfinding Logic. This finds the shortest path while treating tiles with furniture as "blocked".
+function findPath(startG, targetG) {
+    const openList = [{ ...startG, g: 0, h: 0, f: 0, parent: null }];
+    const closedList = new Set();
+    
+    // Create a 2D array of blocked tiles
+    const grid = Array(ROWS).fill().map(() => Array(COLS).fill(false));
+    [gameState.counter, ...gameState.shelves].forEach(obj => {
+        for(let x = obj.gridX; x < obj.gridX + obj.w; x++) {
+            for(let y = obj.gridY; y < obj.gridY + obj.h; y++) {
+                if (x >= 0 && x < COLS && y >= 0 && y < ROWS) grid[y][x] = true;
+            }
+        }
+    });
+
+    while (openList.length > 0) {
+        // Get node with lowest F score
+        openList.sort((a, b) => a.f - b.f);
+        const current = openList.shift();
+        const key = `${current.x},${current.y}`;
+        
+        if (current.x === targetG.x && current.y === targetG.y) {
+            const path = [];
+            let curr = current;
+            while (curr) { path.push({ x: curr.x, y: curr.y }); curr = curr.parent; }
+            return path.reverse();
+        }
+
+        closedList.add(key);
+
+        const neighbors = [
+            { x: current.x + 1, y: current.y }, { x: current.x - 1, y: current.y },
+            { x: current.x, y: current.y + 1 }, { x: current.x, y: current.y - 1 }
+        ];
+
+        for (let n of neighbors) {
+            if (n.x < 0 || n.x >= COLS || n.y < 0 || n.y >= ROWS || grid[n.y][n.x] || closedList.has(`${n.x},${n.y}`)) continue;
+            
+            const gScore = current.g + 1;
+            const hScore = Math.abs(n.x - targetG.x) + Math.abs(n.y - targetG.y);
+            const newNode = { ...n, g: gScore, h: hScore, f: gScore + hScore, parent: current };
+            
+            const existing = openList.find(o => o.x === n.x && o.y === n.y);
+            if (!existing || gScore < existing.g) {
+                if (!existing) openList.push(newNode);
+                else Object.assign(existing, newNode);
+            }
+        }
+    }
+    return null; // No path found
+}
+
+document.getElementById('btn-scratch').addEventListener('click', () => {
+    // Hide the button so it doesn't overlap the scratcher modal
+    document.getElementById('btn-scratch').style.display = 'none';
+    
+    // Call your existing function
+    openScratcher();
+});
 
 // Handle single-touch for movement and multi-touch for action
 canvas.addEventListener('touchstart', (e) => {
@@ -657,8 +1261,30 @@ canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length > 1) {
             triggerAction();
         } else {
-            gameState.player.tX = pos.x;
-            gameState.player.tY = pos.y;
+            const p = gameState.player;
+            // 1. Calculate the Counter's interaction zone (Red Box)
+            const rx = gameState.counter.gridX - 1;
+            const ry = gameState.counter.gridY;
+            
+            // 2. Check if the touch landed inside the red box
+            if (gX === rx && gY >= ry && gY < ry + gameState.counter.h) {
+                const startG = { 
+                    x: Math.floor((p.x - offX) / TILE), 
+                    y: Math.floor((p.y - offY) / TILE) 
+                };
+                const targetG = { x: gX, y: gY };
+                
+                // 3. Trigger the A* pathfinder (Make sure findPath function is added!)
+                const newPath = findPath(startG, targetG);
+                if (newPath) {
+                    p.path = newPath;
+                }
+            } else {
+                // Manual touch movement - Clear path and go to specific point
+                p.path = []; 
+                p.tX = pos.x;
+                p.tY = pos.y;
+            }
         }
     }
 }, { passive: false });
@@ -694,6 +1320,23 @@ sCanvas.addEventListener('touchstart', (e) => {
 }, {passive: false});
 sCanvas.addEventListener('touchmove', handleScratch, {passive: false});
 sCanvas.addEventListener('touchend', () => { isScratching = false; lastX = null; lastY = null; });
+
+// Prevent customer bunching when returning to the tab
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible') {
+        // Reset lastTime so the 'dt' (delta time) doesn't explode
+        lastTime = performance.now();
+        
+        // Optional: Clear and restart the spawn interval 
+        // to give the player a 3-second 'breather' upon return
+        clearInterval(spawnInterval);
+        spawnInterval = setInterval(() => {
+            if (gameState.customers.length < 8) spawnCustomer();
+        }, 3500);
+    }
+});
+
+let spawnInterval = setInterval(() => { if(gameState.customers.length < 8) console.log("Checking spawn timer..."); spawnCustomer(); }, 3500);
 </script>
 </body>
 </html>
