@@ -5,145 +5,291 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Scratcher Sim</title>
     <style>
-    :root { 
-        --primary: #2196F3; 
-        --accent: #4CAF50; 
-        --danger: #f44336; 
-        --dark: #1a1a1a;
-        /* Default vh if JS hasn't calculated it yet */
-        --vh: 1vh; 
+    :root {
+        --primary:  #3b82f6;
+        --accent:   #22c55e;
+        --danger:   #ef4444;
+        --warning:  #f97316;
+        --purple:   #a855f7;
+        --bg:       #0f172a;
+        --surface:  #1e293b;
+        --surface2: #334155;
+        --border:   #475569;
+        --text:     #f1f5f9;
+        --muted:    #94a3b8;
+        --vh: 1vh;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    * { box-sizing: border-box; }
-
-    body { 
-        margin: 0; 
-        /* Use the custom variable for height */
+    body {
         height: calc(var(--vh, 1vh) * 100);
-        overflow: hidden; 
-        background: #111; 
-        font-family: 'Segoe UI', sans-serif; 
-        touch-action: none; 
-        display: flex; 
-        flex-direction: column; /* Stack elements vertically */
+        overflow: hidden;
+        background: var(--bg);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        touch-action: none;
+        display: flex;
+        flex-direction: column;
         -webkit-user-select: none;
+        color: var(--text);
     }
 
-    #top-bar { 
-        height: 50px; 
-        background: rgba(0,0,0,0.9); 
-        display: flex; 
-        justify-content: space-around; 
-        align-items: center; 
-        color: white; 
-        font-size: 13px; 
-        border-bottom: 2px solid #444;
-        flex-shrink: 0; /* Don't let it squash */
-    }
-
-    #gameCanvas { 
-        flex-grow: 1; /* Take up all remaining space */
-        display: block; 
-        width: 100%;
-        background: #1a1a1a; 
-    }
-
-    #bottom-bar { 
-        height: 80px; /* Slightly shorter for mobile thumb reach */
-        background: rgba(0,0,0,0.8); 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        gap: 15px; 
+    /* ── Top Bar ── */
+    #top-bar {
+        height: 52px;
+        background: var(--surface);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
         flex-shrink: 0;
-        padding-bottom: env(safe-area-inset-bottom); /* iOS Notch support */
+        gap: 12px;
     }
-        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 350px; z-index: 110; }
+    .top-stat {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 13px; font-weight: 600; color: var(--muted);
+    }
+    .top-stat b { color: var(--text); font-size: 15px; }
+    #mode-badge {
+        font-size: 11px; font-weight: 700; letter-spacing: 1px;
+        padding: 3px 10px; border-radius: 20px;
+        background: rgba(249,115,22,0.15); color: var(--warning);
+        border: 1px solid rgba(249,115,22,0.3);
+        transition: all 0.2s;
+    }
+    #mode-badge.build { background: rgba(168,85,247,0.15); color: var(--purple); border-color: rgba(168,85,247,0.3); }
 
-       #modal, #scratcher-modal {
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        z-index: 200; width: 90%; max-width: 400px;
+    /* ── Canvas ── */
+    #gameCanvas { flex-grow: 1; display: block; width: 100%; background: var(--bg); }
+
+    /* ── Bottom Bar ── */
+    #bottom-bar {
+        height: 72px;
+        background: var(--surface);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        padding-bottom: env(safe-area-inset-bottom);
+        border-top: 1px solid var(--border);
     }
 
-    /* Rest of your modal styles remain the same... */
-    #build-confirm { display: none; position: absolute; gap: 10px; z-index: 100; }
-    .btn { padding: 10px 15px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; min-width: 70px; }
-    .btn-confirm { background: var(--accent); }
-    .btn-cancel { background: var(--danger); }
-    .btn-build { background: #e91e63; }
-    .btn-action { background: #ff9800; border: 2px solid white; }
-
-    /* The container must be relative so the canvas can sit on top */
-    #scratch-container { 
-        position: relative; width: 280px; height: 280px; 
-        background: #white; margin: 10px auto; border-radius: 10px; overflow: hidden;
+    /* ── Buttons ── */
+    .btn {
+        padding: 9px 14px; border: none; border-radius: 10px;
+        color: white; cursor: pointer; font-weight: 700;
+        font-size: 12px; letter-spacing: 0.5px;
+        transition: opacity 0.15s, transform 0.1s;
+        min-width: 64px; white-space: nowrap;
     }
-    .prize-val { position: absolute; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #1e293b; font-weight: bold; }
-    /* The canvas sits on the top layer */
-    #scratch-canvas { position: absolute; top: 0; left: 0; z-index: 10; background: transparent !important; /* Vital for destination-out to work */ touch-action: none; }
-    /* 2x2 Grid Layout */
-    /* The grid sits at the bottom layer */
+    .btn:active { transform: scale(0.95); opacity: 0.85; }
+    .btn-primary  { background: var(--primary); }
+    .btn-accent   { background: var(--accent); }
+    .btn-danger   { background: var(--danger); }
+    .btn-warning  { background: var(--warning); }
+    .btn-purple   { background: var(--purple); }
+    .btn-surface  { background: var(--surface2); border: 1px solid var(--border); }
+    .btn-build    { background: #e91e63; }
+    .btn-confirm  { background: var(--accent); }
+    .btn-cancel   { background: var(--danger); }
+    .btn-action   { background: var(--warning); }
+    .btn-sm       { padding: 6px 10px; font-size: 11px; min-width: 0; }
+    .btn-block    { width: 100%; margin-top: 8px; }
+
+    /* ── Modals ── */
+    .modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6); z-index: 190;
+    }
+    .modal-overlay.open { display: block; }
+    .modal-box {
+        position: fixed; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 200; width: 92%; max-width: 400px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    }
+    .modal-title {
+        font-size: 17px; font-weight: 700; margin-bottom: 16px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .modal-section {
+        background: var(--surface2); border-radius: 10px;
+        padding: 12px 14px; margin-bottom: 10px;
+    }
+    .modal-section-title {
+        font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+        color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+    }
+    .modal-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 4px 0; font-size: 13px; gap: 8px;
+    }
+    .modal-row .label { color: var(--muted); }
+    .modal-row .value { font-weight: 600; }
+    .worker-task-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .task-btn {
+        padding: 10px 8px; border-radius: 10px; border: 2px solid transparent;
+        background: var(--bg); cursor: pointer; color: var(--muted);
+        font-size: 11px; font-weight: 700; text-align: center;
+        transition: all 0.15s;
+    }
+    .task-btn .task-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+    .task-btn:hover { border-color: var(--border); color: var(--text); }
+    .task-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(59,130,246,0.1); }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+    /* ── Build confirm ── */
+    #build-confirm {
+        display: none; position: fixed;
+        bottom: 82px; left: 50%; transform: translateX(-50%);
+        gap: 10px; z-index: 100; background: var(--surface);
+        padding: 10px 16px; border-radius: 12px;
+        border: 1px solid var(--border);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    }
+
+    /* ── Scratcher ── */
+    #scratch-container {
+        position: relative; width: 280px; height: 280px;
+        margin: 10px auto; border-radius: 12px; overflow: hidden;
+        border: 2px solid var(--border);
+    }
     .prize-grid {
         display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
         width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
+        background: white;
     }
     .prize-cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3rem;
-    color: #333 !important; /* Force dark color so emojis show up */
-    border: 1px solid #f0f0f0;
-}
+        display: flex; align-items: center; justify-content: center;
+        font-size: 3rem; color: #333 !important;
+        border: 1px solid #f0f0f0;
+    }
+    #scratch-canvas {
+        position: absolute; top: 0; left: 0; z-index: 10;
+        background: transparent !important; touch-action: none;
+    }
 
-        canvas { display: block; background: #1a1a1a; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-
-        /* Mobile optimization to prevent zooming and selection */
-body { touch-action: none; -webkit-user-select: none; }
-/* Style for the new Action button */
-.btn-action { background: #ff9800; border: 2px solid white; }
+    canvas { display: block; }
+    body { touch-action: none; -webkit-user-select: none; }
     </style>
 </head>
 <body>
-
-<div id="top-bar">
-    <div>CASH: <b id="ui-cash" style="color:var(--accent)">$500</b> | HELD: <b id="ui-held" style="color:var(--primary)">0</b></div>
-    <div id="mode-text" style="color: #ff9800;">PLAY MODE</div>
-</div>
-
-<div id="build-confirm">
-    <button class="btn btn-confirm" onclick="confirmPlacement()">✓</button>
-    <button class="btn btn-cancel" onclick="clearBuildState()">X</button>
-</div>
-
-<div id="modal">
-    <h3 style="margin-top:0">Office</h3>
-    <button class="btn" style="background:var(--accent); width:100%" onclick="buyStock()">BUY STOCK BOX ($50)</button>
-    <button class="btn" style="background:var(--danger); width:100%; margin-top:10px" onclick="resetGame()">RESET DATA</button>
-    <button class="btn" style="background:#555; width:100%; margin-top:10px" onclick="closeModal()">CLOSE</button>
-</div>
-
-<div id="scratcher-modal" class="modal" style="display:none; background:#334155; color:white; padding:20px;">
-    <h3 style="margin-top:0">LUCKY SCRATCHER</h3>
-    <div id="scratch-container">
-        <div class="prize-grid" id="prize-grid">
-            <div class="prize-cell">?</div><div class="prize-cell">?</div>
-            <div class="prize-cell">?</div><div class="prize-cell">?</div>
-        </div>
-        <canvas id="scratch-canvas" width="280" height="280"></canvas>
+    <!-- Top Bar -->
+    <div id="top-bar">
+        <div class="top-stat">💵 <b id="ui-cash">$500</b></div>
+        <div id="mode-badge">PLAY MODE</div>
+        <div class="top-stat">📦 <b id="ui-held">0</b></div>
     </div>
-    <p>Match 2 for $10, Match 3 for $50!</p>
-    <button class="btn btn-cancel" onclick="closeScratcher()">CLOSE</button>
-</div>
 
-<canvas id="gameCanvas"></canvas>
+    <!-- Canvas -->
+    <canvas id="gameCanvas"></canvas>
 
-<div id="bottom-bar">
-    <button class="btn btn-build" id="build-toggle" onclick="toggleBuildMode()">BUILD</button>
-    <button class="btn btn-action" id="action-btn" onclick="triggerAction()">ACTION</button>
-    <button id="btn-scratch" class="btn" style="display: none; background: var(--accent);">SCRATCH</button>
-    <button class="btn" style="background:var(--primary)" onclick="openModal()">OFFICE</button>
-</div>
+    <!-- Bottom Bar -->
+    <div id="bottom-bar">
+        <button class="btn btn-build"    id="build-toggle"  onclick="toggleBuildMode()">🔨 BUILD</button>
+        <button class="btn btn-action"   id="action-btn"    onclick="triggerAction()">⚡ ACTION</button>
+        <button id="btn-scratch" class="btn btn-accent"     style="display:none">🎟 SCRATCH</button>
+        <button id="btn-pickup"  class="btn btn-warning"    style="display:none" onclick="triggerAction()">📦 PICKUP</button>
+        <button class="btn btn-primary"                     onclick="openModal()">🏢 OFFICE</button>
+    </div>
+
+    <!-- Build confirm overlay -->
+    <div id="build-confirm" style="display:none; flex-direction:row;">
+        <button class="btn btn-confirm" onclick="confirmPlacement()">✓ Place</button>
+        <button class="btn btn-cancel"  onclick="clearBuildState()">✕ Cancel</button>
+    </div>
+
+    <!-- Office Modal Overlay -->
+    <div class="modal-overlay" id="office-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal-box" id="modal" style="display:block">
+            <div class="modal-title">🏢 Office</div>
+
+            <!-- Inventory -->
+            <div class="modal-section">
+                <div class="modal-section-title">📦 Inventory</div>
+                <div class="modal-row">
+                    <span class="label">Order a stock crate</span>
+                    <button class="btn btn-accent btn-sm" onclick="buyStock()">Buy $50</button>
+                </div>
+            </div>
+
+            <!-- Shop -->
+            <div class="modal-section">
+                <div class="modal-section-title">🏗 Shop</div>
+                <div class="modal-row">
+                    <span class="label">Add a new shelf</span>
+                    <button class="btn btn-primary btn-sm" onclick="addShelf()">Add $100</button>
+                </div>
+                <div class="modal-row" style="margin-top:6px">
+                    <span class="label">Expand room downward</span>
+                    <button class="btn btn-purple btn-sm" onclick="expandRoom()">Expand $300</button>
+                </div>
+            </div>
+
+            <!-- Staff -->
+            <div class="modal-section" id="staff-section">
+                <div class="modal-section-title">👷 Staff</div>
+                <div id="hire-row" class="modal-row">
+                    <span class="label">Hire a worker</span>
+                    <button class="btn btn-warning btn-sm" onclick="hireWorker()">Hire $200</button>
+                </div>
+                <div id="worker-tasks" style="display:none">
+                    <div class="modal-row" style="margin-bottom:8px">
+                        <span class="label">Worker status:</span>
+                        <span class="value" id="worker-status-label">Idle</span>
+                    </div>
+                    <div class="worker-task-grid">
+                        <button class="task-btn" id="task-register" onclick="assignWorker('MANNING_REGISTER')">
+                            <span class="task-icon">🧾</span>Man Register
+                        </button>
+                        <button class="task-btn" id="task-stock" onclick="assignWorker('STOCKING')">
+                            <span class="task-icon">📦</span>Stock Shelves
+                        </button>
+                        <button class="task-btn" id="task-idle" onclick="assignWorker('IDLE')">
+                            <span class="task-icon">☕</span>Rest
+                        </button>
+                        <button class="task-btn" id="task-fire" onclick="fireWorker()" style="border-color:#ef4444;color:#ef4444">
+                            <span class="task-icon">🔥</span>Fire Worker
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <!-- Danger zone -->
+            <div style="display:flex; gap:8px">
+                <button class="btn btn-danger btn-sm" style="flex:1" onclick="resetGame()">⚠ Reset</button>
+                <button class="btn btn-surface btn-sm" style="flex:1" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scratcher Modal Overlay -->
+    <div class="modal-overlay" id="scratcher-overlay" onclick="if(event.target===this)closeScratcher()">
+        <div class="modal-box" id="scratcher-modal" style="display:block; text-align:center;">
+            <div class="modal-title" style="justify-content:center">🎟 Lucky Scratcher</div>
+            <div id="scratch-container">
+                <div class="prize-grid" id="prize-grid">
+                    <div class="prize-cell">?</div><div class="prize-cell">?</div>
+                    <div class="prize-cell">?</div><div class="prize-cell">?</div>
+                </div>
+                <canvas id="scratch-canvas" width="280" height="280"></canvas>
+            </div>
+            <p style="color:var(--muted); font-size:13px; margin:12px 0 16px;">Match 2 for $10 · Match 3 for $50</p>
+            <button class="btn btn-danger" onclick="closeScratcher()">Close</button>
+        </div>
+    </div>
+
+<script src="camera.js"></script>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -166,11 +312,13 @@ let restockTimer = 0;
 let crateCost = 50;
 
 let gameState = {
-    money: 500, moneyTexts: [], // Array to track floating +$5, +$10 labels
+    money: 500, moneyTexts: [],
     mode: 'PLAY',
-    player: { x: 0, y: 0, tX: 0, tY: 0, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50, path: [] },
-    counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter' },
-    shelves: [{ gridX: 7, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf' }],
+    roomRows: 8,  // expandable
+    player: { x: 400, y: 500, tX: 400, tY: 500, size: 15, angle: 0, speed: 200, holding: 0, maxHolding: 50, path: [] },
+    worker: null, // null = not hired
+    counter: { gridX: 1, gridY: 4, w: 1, h: 3, type: 'counter', isDragging: false },
+    shelves: [{ gridX: 7, gridY: 3, w: 1, h: 4, stock: 50, max: 100, type: 'shelf', isDragging: false }],
     customers: [],
     deliveries: [],
     movingObj: null, isPlaced: false, tempPos: { gX: 0, gY: 0 }, mouse: { x: 0, y: 0 }
@@ -181,12 +329,19 @@ const sCanvas = document.getElementById('scratch-canvas');
 const sCtx = sCanvas.getContext('2d');
 let scratchActive = false;
 let isScratching = false;
+let lastX = null, lastY = null;
 let scratchCooldown = 5.0; // Prevents the shelf from "spamming" cards
 const symbols = ['🍒', '💎', '🍋', '⭐', '🔔']; // Symbols from your scratcher file
 let currentPendingWin = 0;
 
 function getRect(obj) { return { x: offX + obj.gridX * TILE, y: offY + obj.gridY * TILE, w: obj.w * TILE, h: obj.h * TILE }; }
 function isInZone(px, py, zone) { return px > zone.x && px < zone.x + zone.w && py > zone.y && py < zone.y + zone.h; }
+
+
+// Initialize Camera from the camera.js file
+Camera.init(canvas);
+
+
 
 function checkCollision(nx, ny, isAI = false) {
     const doorMargin = 5; // Extra wiggle room to get through the door
@@ -302,8 +457,9 @@ function updateCustomers(dt) {
         w: TILE, h: gameState.counter.h * TILE
     };
 
-    // 3. Process the transaction
-    if (payQueue.length > 0 && isInZone(gameState.player.x, gameState.player.y, regZone)) {
+    // 3. Process the transaction — player OR worker in zone qualifies
+    const workerInZone = gameState.worker && isInZone(gameState.worker.x, gameState.worker.y, regZone);
+    if (payQueue.length > 0 && (isInZone(gameState.player.x, gameState.player.y, regZone) || workerInZone)) {
         const firstC = payQueue[0];
         
         // Ensure the customer has actually reached their destination at the counter
@@ -450,6 +606,11 @@ function updateCustomers(dt) {
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 2. START THE SANDWICH (Everything inside moves with the camera)
+    Camera.apply(ctx, canvas);
+
+    // Draw the store background/floor
+    //drawStore();
     let p = gameState.player;
 
     // Environment
@@ -525,9 +686,6 @@ function draw() {
     }
     ctx.setLineDash([]);
 
-    ctx.strokeStyle = "white"; ctx.lineWidth = 4; ctx.strokeRect(offX, offY, COLS*TILE, ROWS*TILE);
-    ctx.fillStyle = "#1e1e1e"; ctx.fillRect(offX + TILE * 1, offY - 8, TILE * 3, 16);
-
     gameState.deliveries.forEach(d => {
         // Calculate current screen pixels based on the grid
         const drawX = offX + (d.gX * TILE);
@@ -550,30 +708,52 @@ function draw() {
 
     [gameState.counter, ...gameState.shelves].forEach(obj => {
         if (gameState.movingObj === obj) return;
-        ctx.fillStyle = "#555"; ctx.fillRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
-        if (obj.type === 'shelf') {
-            ctx.fillStyle = "white"; ctx.font = "10px Arial"; ctx.textAlign = "left";
-            ctx.fillText(`STOCK: ${obj.stock}`, offX + obj.gridX * TILE, offY + obj.gridY * TILE - 5);
+        // Counter
+        if (obj.type === 'counter') {
+            ctx.fillStyle = "#4a3728"; ctx.fillRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
+            ctx.strokeStyle = "#8B6914"; ctx.lineWidth = 2;
+            ctx.strokeRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
+            ctx.fillStyle = "#f97316"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+            ctx.fillText("REG", offX + obj.gridX * TILE + obj.w * TILE / 2, offY + obj.gridY * TILE + obj.h * TILE / 2 + 3);
+        } else {
+            // Shelf — draw with fill bar
+            ctx.fillStyle = "#374151"; ctx.fillRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
+            ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 2;
+            ctx.strokeRect(offX + obj.gridX * TILE, offY + obj.gridY * TILE, obj.w * TILE, obj.h * TILE);
+            // Stock fill bar
+            const fillH = (obj.stock / obj.max) * (obj.h * TILE - 4);
+            ctx.fillStyle = obj.stock > 20 ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)";
+            ctx.fillRect(offX + obj.gridX * TILE + 2, offY + obj.gridY * TILE + (obj.h * TILE - 2) - fillH, obj.w * TILE - 4, fillH);
+            // Label
+            ctx.fillStyle = obj.stock > 0 ? "white" : "#ef4444";
+            ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+            ctx.fillText(obj.stock > 0 ? `${obj.stock}` : "EMPTY", offX + obj.gridX * TILE + obj.w * TILE / 2, offY + obj.gridY * TILE - 4);
         }
     });
 
-    // Near where shelves are drawn
-        if (gameState.shelves[0].stock <= 0) {
-            ctx.fillStyle = "white";
-            ctx.font = "bold 10px Arial";
-            ctx.fillText("OUT OF STOCK", offX + (gameState.shelves[0].gridX + 1) * TILE, offY + (gameState.shelves[0].gridY + 1) * TILE);
-        }
-
     if (gameState.movingObj) {
-        let gx = gameState.isPlaced ? gameState.tempPos.gX : Math.floor((gameState.mouse.x - offX) / TILE);
-        let gy = gameState.isPlaced ? gameState.tempPos.gY : Math.floor((gameState.mouse.y - offY) / TILE);
-        ctx.globalAlpha = 0.4;
-        const blocksDoor = (gx < 5 && gy < 3);
-        const oob = (gx < 0 || gx + gameState.movingObj.w > COLS || gy < 0 || gy + gameState.movingObj.h > ROWS || blocksDoor);
-        ctx.fillStyle = oob ? "red" : "cyan";
-        ctx.fillRect(offX + gx * TILE, offY + gy * TILE, gameState.movingObj.w * TILE, gameState.movingObj.h * TILE);
-        ctx.globalAlpha = 1.0;
-    }
+    // If we haven't clicked to set a 'temp' spot yet, follow the mouse exactly
+    // Otherwise, show the ghost at the potential placement spot (tempPos)
+    let gx = gameState.isPlaced ? gameState.tempPos.gX : Math.floor((gameState.mouse.x - offX) / TILE);
+    let gy = gameState.isPlaced ? gameState.tempPos.gY : Math.floor((gameState.mouse.y - offY) / TILE);
+
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    
+    // Check if the current position is valid
+    const blocksDoor = (gx < 5 && gy < 3);
+    const oob = (gx < 0 || gx + gameState.movingObj.w > COLS || gy < 0 || gy + gameState.movingObj.h > ROWS || blocksDoor);
+    
+    // Draw the ghost box
+    ctx.fillStyle = oob ? "red" : "cyan";
+    ctx.fillRect(offX + gx * TILE, offY + gy * TILE, gameState.movingObj.w * TILE, gameState.movingObj.h * TILE);
+    
+    // Draw the actual object texture/color as a ghost too so you can see it
+    ctx.fillStyle = "#555";
+    ctx.fillRect(offX + gx * TILE + 2, offY + gy * TILE + 2, (gameState.movingObj.w * TILE) - 4, (gameState.movingObj.h * TILE) - 4);
+    
+    ctx.restore();
+}
 
     ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
     ctx.fillStyle = '#2196F3'; ctx.beginPath(); ctx.arc(0,0,p.size,0,Math.PI*2); ctx.fill();
@@ -602,6 +782,37 @@ function draw() {
 
         ctx.restore();
     } // end of holding box
+
+    // Draw Worker (if hired)
+    if (gameState.worker) {
+        const w = gameState.worker;
+        ctx.save();
+        ctx.translate(w.x, w.y);
+        ctx.rotate(w.angle);
+        // Body
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+        // Eye dot
+        ctx.fillStyle = 'white';
+        ctx.beginPath(); ctx.arc(6, 0, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        // Worker held box
+        if (w.holding > 0) {
+            ctx.save(); ctx.translate(w.x, w.y); ctx.rotate(w.angle);
+            ctx.fillStyle = "#d2b48c"; ctx.fillRect(10, -6, 12, 12);
+            ctx.strokeStyle = "#8b4513"; ctx.strokeRect(10, -6, 12, 12);
+            ctx.rotate(-w.angle);
+            ctx.fillStyle = "white"; ctx.font = "bold 9px Arial"; ctx.textAlign = "center";
+            ctx.fillText(w.holding, Math.cos(w.angle) * 16, Math.sin(w.angle) * 16 + 3);
+            ctx.restore();
+        }
+        // Task emote
+        const wEmote = { 'MANNING_REGISTER': '🧾', 'STOCKING': '📦', 'FETCHING_CRATE': '🚶', 'IDLE': '☕' }[w.task] || '';
+        if (wEmote) {
+            ctx.font = "14px Arial"; ctx.textAlign = "center";
+            ctx.fillText(wEmote, w.x, w.y - 22);
+        }
+    }
 
 // 4. DRAW CUSTOMERS (Must be after environment)
     gameState.customers.forEach(c => {
@@ -663,38 +874,58 @@ function draw() {
         ctx.fillText(mt.val, mt.x, mt.y);
         ctx.globalAlpha = 1.0;
     });
+
+    Camera.detach(ctx);
+    // 3. END THE SANDWICH (Everything after this stays fixed on the screen)
 }
 
 function loop(timestamp) {
+    //if (!p) return; // Safety check
+    let p = gameState.player;
+
+    // --- MOVEMENT ENGINE ---
+    // Calculate how far we are from the target
+    const dx = (p.targetX || p.x) - p.x;
+    const dy = (p.targetY || p.y) - p.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
     let dt = (timestamp - lastTime) / 1000;
     if (dt > 0.1) dt = 0.1; lastTime = timestamp;
 
     if (scratchCooldown > 0) scratchCooldown -= dt; 
 
-    let p = gameState.player;
+    
     if (gameState.mode === 'PLAY') {
-        // Pathfinding movement
-        if (p.path && p.path.length > 0) {
-            const nextTile = p.path[0];
-            p.tX = offX + (nextTile.x + 0.5) * TILE;
-            p.tY = offY + (nextTile.y + 0.5) * TILE;
+        // 1. If we have a path, the path dictates the target (tX, tY)
+    if (p.path && p.path.length > 0) {
+        const nextNode = p.path[0];
+        p.tX = offX + (nextNode.x + 0.5) * TILE;
+        p.tY = offY + (nextNode.y + 0.5) * TILE;
 
-            const dist = Math.hypot(p.x - p.tX, p.y - p.tY);
-            if (dist < 5) p.path.shift(); 
+        const distToNode = Math.hypot(p.x - p.tX, p.y - p.tY);
+        if (distToNode < 8) {
+            p.path.shift(); // Move to the next node
+            if (p.path.length === 0) {
+                // Snap to final position to prevent shivering
+                p.x = p.tX; p.y = p.tY;
+            }
         }
+    }
+
+    // 2. Perform the actual movement toward tX, tY
+    let dx = p.tX - p.x;
+    let dy = p.tY - p.y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 2) { // Minimal threshold
+        let vx = (dx / dist) * p.speed * dt;
+        let vy = (dy / dist) * p.speed * dt;
         
-        // standard movement
-        let dx = p.tX - p.x, dy = p.tY - p.y;
-        let dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > 5) {
-            let vx = (dx/dist) * p.speed * dt, vy = (dy/dist) * p.speed * dt;
-            if (!checkCollision(p.x + vx, p.y)) p.x += vx;
-            if (!checkCollision(p.x, p.y + vy)) p.y += vy;
-            p.angle = Math.atan2(dy, dx);
-
-            p.relX = (p.x - offX) / TILE;
-            p.relY = (p.y - offY) / TILE;
-        }
+        if (!checkCollision(p.x + vx, p.y)) p.x += vx;
+        if (!checkCollision(p.x, p.y + vy)) p.y += vy;
+        
+        p.angle = Math.atan2(dy, dx);
+    }
+        
         
         // Interaction Logic (Shelves/Restocking)
         const s = gameState.shelves[0];
@@ -724,6 +955,24 @@ function loop(timestamp) {
         } else {
             document.getElementById('btn-scratch').style.display = 'none';
         }
+
+        // PICKUP button: show on mobile when a crate is within reach and player isn't already holding max
+        const pickupBtn = document.getElementById('btn-pickup');
+        const nearCrate = gameState.deliveries.some(d => {
+            const crateX = offX + (d.gX * TILE);
+            const crateY = offY + (d.gY * TILE);
+            return Math.hypot(p.x - crateX, p.y - crateY) < TILE * 1.5;
+        });
+        // Show PICKUP when near a crate, or DROP when already holding something
+        if (p.holding > 0) {
+            pickupBtn.textContent = 'DROP';
+            pickupBtn.style.display = 'block';
+        } else if (nearCrate && p.holding < p.maxHolding) {
+            pickupBtn.textContent = 'PICKUP';
+            pickupBtn.style.display = 'block';
+        } else {
+            pickupBtn.style.display = 'none';
+        }
     } 
 
     // Update Floating Money Texts
@@ -735,23 +984,38 @@ function loop(timestamp) {
         if (mt.life <= 0) gameState.moneyTexts.splice(i, 1);
     }
 
-    updateCustomers(dt); 
+    updateCustomers(dt);
+    updateWorker(dt);
     draw();
     requestAnimationFrame(loop); 
 } 
 
 // Utility and Handlers
-function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, customers: gameState.customers, player: gameState.player, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries})); }
+function saveGame() { localStorage.setItem('scratcherSimData', JSON.stringify({money: gameState.money, customers: gameState.customers, player: gameState.player, counter: gameState.counter, shelves: gameState.shelves, deliveries: gameState.deliveries, worker: gameState.worker, roomRows: gameState.roomRows})); }
 function loadGame() {
     const saved = localStorage.getItem('scratcherSimData');
     if (saved) {
         const loaded = JSON.parse(saved);
+
+        // gameState = data;
+        const p = gameState.player;
+        
+        // This stops them from walking to (0,0) or jumping when the game loads
+        p.targetX = p.x;
+        p.targetY = p.y;
+        
+        // Camera is always anchored to canvas center — resize() will re-apply this,
+        // but set it here too so the first draw frame is correct.
+        Camera.x = canvas.width / 2;
+        Camera.y = canvas.height / 2;
         
         // Restore basic stats
         gameState.money = loaded.money ?? 500;
+        if (loaded.roomRows) gameState.roomRows = loaded.roomRows;
         if (loaded.counter) gameState.counter = loaded.counter;
         if (loaded.shelves) gameState.shelves = loaded.shelves;
         if (loaded.deliveries) gameState.deliveries = loaded.deliveries;
+        if (loaded.worker) gameState.worker = loaded.worker;
         if (loaded.player) {
             // Restore the basic stats
             Object.assign(gameState.player, loaded.player);
@@ -777,6 +1041,12 @@ function loadGame() {
                 if (!c.queueTime) c.queueTime = Date.now();
                 
                 return c;
+            });
+        }
+        // Ensure all customers have a queueTime so line order doesn't break
+        if (gameState.customers) {
+            gameState.customers.forEach(c => {
+                if (!c.queueTime) c.queueTime = Date.now();
             });
         }
     }
@@ -818,7 +1088,7 @@ function resize() {
 
     // FIX: Define a fixed internal room size so no one has a "larger" room
     const INTERNAL_COLS = 12;
-    const INTERNAL_ROWS = 8;
+    const INTERNAL_ROWS = gameState.roomRows; // expandable via Office
 
     // 2. NEW RELATIVE CALCULATION: 
     // This makes sure 15 columns and 12 rows ALWAYS fit the screen.
@@ -841,6 +1111,32 @@ function resize() {
     // Global Door Position for AI and Collision
     doorXStart = offX + TILE * 1;
     doorXEnd = offX + TILE * 4;
+
+    // Reset camera so world coords = canvas pixel coords (camera at canvas center).
+    // This must happen every resize — it is the foundation of the coordinate system.
+    Camera.x = canvas.width / 2;
+    Camera.y = canvas.height / 2;
+
+    // Player repositioning: use saved relative grid position, or spawn inside the shop
+    // on first load (before any save data exists).
+    if (gameState.player.relX !== undefined) {
+        gameState.player.x = offX + (gameState.player.relX * TILE);
+        gameState.player.y = offY + (gameState.player.relY * TILE);
+    } else {
+        // First-time spawn: place to the right of the counter, vertically centred on it
+        gameState.player.x = offX + (gameState.counter.gridX + gameState.counter.w + 0.5) * TILE;
+        gameState.player.y = offY + (gameState.counter.gridY + gameState.counter.h / 2) * TILE;
+    }
+    gameState.player.tX = gameState.player.x;
+    gameState.player.tY = gameState.player.y;
+
+    // Re-anchor worker if hired
+    if (gameState.worker && gameState.worker.relX !== undefined) {
+        gameState.worker.x = offX + (gameState.worker.relX * TILE);
+        gameState.worker.y = offY + (gameState.worker.relY * TILE);
+        gameState.worker.tX = gameState.worker.x;
+        gameState.worker.tY = gameState.worker.y;
+    }
 
     // RE-ANCHOR DELIVERY CRATES
     if (gameState.deliveries) {
@@ -867,51 +1163,9 @@ function resize() {
         if (obj.gridY + obj.h > ROWS) obj.gridY = ROWS - obj.h;
     });
 
-    // Reset player position behind counter
-    //gameState.player.x = offX + (gameState.counter.gridX - 0.5) * TILE;
-    //gameState.player.y = offY + (gameState.counter.gridY + 1.5) * TILE;
-    //gameState.player.tX = gameState.player.x;
-    //gameState.player.tY = gameState.player.y;
-
-    // This keeps the player on the same TILE they were standing on before the resize
-    if (gameState.player.relX !== undefined) {
-        gameState.player.x = offX + (gameState.player.relX * TILE);
-        gameState.player.y = offY + (gameState.player.relY * TILE);
-        gameState.player.tX = gameState.player.x;
-        gameState.player.tY = gameState.player.y;
-    }
-
-    // RE-SYNC CUSTOMER TARGETS
+    // RE-SYNC CUSTOMER TARGETS (positions and targets updated in one pass below)
     gameState.customers.forEach(c => {
-        // If they were heading to the door, update the door coordinates
-        if (c.state === 'WALKING' || c.state === 'LEAVING') {
-            c.tX = (doorXStart + doorXEnd) / 2;
-            c.tY = offY - 20; 
-        } 
-        // If they were in line at the shelf, recalculate their spot
-        else if (c.state === 'TO_SHELF' || c.state === 'PICKING') {
-            const shelf = gameState.shelves[0];
-            const shelfQueue = gameState.customers
-                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
-                .sort((a, b) => a.queueTime - b.queueTime);
-            const pos = shelfQueue.indexOf(c);
-            
-            c.tX = offX + (shelf.gridX - 0.8) * TILE;
-            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
-        }
-        // If they were waiting at the counter, recalculate the line
-        else if (c.state === 'WAITING') {
-            const payQueue = gameState.customers
-                .filter(cust => cust.state === 'WAITING')
-                .sort((a, b) => a.queueTime - b.queueTime);
-            const pos = payQueue.indexOf(c);
-            
-            c.tX = offX + (gameState.counter.gridX + gameState.counter.w) * TILE + 20 + (pos * 40);
-            c.tY = offY + (gameState.counter.gridY + 1.5) * TILE;
-        }
-
         // 1. CONVERT PIXELS TO RELATIVE GRID POSITION (Before offX/offY change)
-        // Note: We do this by capturing how many TILEs they were from the old origin
         const relX = (c.x - oldOffX) / oldTile;
         const relY = (c.y - oldOffY) / oldTile;
 
@@ -942,79 +1196,315 @@ function resize() {
     });
 }
 
-function toggleBuildMode() { gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY'; document.getElementById('mode-text').innerText = gameState.mode + " MODE"; if(gameState.mode === 'PLAY') clearBuildState(); }
-function confirmPlacement() { 
-    if(gameState.movingObj){ 
-        // Ensure the object stays within the defined 15x12 grid
-        gameState.movingObj.gridX = Math.max(0, Math.min(gameState.tempPos.gX, COLS - gameState.movingObj.w)); 
-        gameState.movingObj.gridY = Math.max(0, Math.min(gameState.tempPos.gY, ROWS - gameState.movingObj.h)); 
-    } 
-    clearBuildState(); 
-    saveGame(); 
-}
-function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
-function openModal() { document.getElementById('modal').style.display = 'block'; }
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
-function resetGame() { if(confirm("Clear All?")) { localStorage.removeItem('scratcherSimData'); location.reload(); } }
+let draggedObject = null;
 
-canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); gameState.mouse.x = e.clientX - rect.left; gameState.mouse.y = e.clientY - rect.top; });
-canvas.addEventListener('mousedown', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const gX = Math.floor((mx - offX) / TILE);
-    const gY = Math.floor((my - offY) / TILE);
+function checkFurnitureHit(worldPos) {
+    const items = [gameState.counter, ...gameState.shelves]; // BUG FIX: was missing spread on shelves
+    for (let item of items) {
+        const itemX = offX + item.gridX * TILE;
+        const itemY = offY + item.gridY * TILE;
 
-    const p = gameState.player; // Fixes the 'p is not defined' error
-
-    if (gameState.mode === 'PLAY') {
-        // Calculate the Counter's interaction zone (Red Box)
-        const rx = gameState.counter.gridX - 1;
-        const ry = gameState.counter.gridY;
-        
-        if (gX === rx && gY >= ry && gY < ry + gameState.counter.h) {
-            // Clicked the Red Box! Find path.
-            const startG = { 
-                x: Math.floor((p.x - offX) / TILE), 
-                y: Math.floor((p.y - offY) / TILE) 
-            };
-            const targetG = { x: gX, y: gY };
-            p.path = findPath(startG, targetG);
-        } else {
-            // Manual click movement
-            p.path = []; // Cancel current path
-            p.tX = mx; 
-            p.tY = my; 
+        // BUG FIX: objects use .w and .h, not .width and .height
+        if (worldPos.x > itemX && worldPos.x < itemX + item.w * TILE &&
+            worldPos.y > itemY && worldPos.y < itemY + item.h * TILE) {
+            return item;
         }
     }
-    
-
-    // 1. DROP BOX LOGIC (Right-Click only)
-    if (e.button === 2) { 
-    triggerAction(); // Use the shared function for Right-Click
-    return;
+    return null;
 }
 
-    // 2. MOVEMENT & BUILD LOGIC (Left-Click only)
-    if (e.button === 0) {
-        if (gameState.mode === 'BUILD') {
-            if (!gameState.movingObj) {
-                if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) gameState.movingObj = gameState.counter;
-                gameState.shelves.forEach(s => { if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s; });
-            } else if (!gameState.isPlaced) {
-                if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
-                    gameState.tempPos = { gX, gY }; gameState.isPlaced = true;
-                    const ui = document.getElementById('build-confirm');
-                    ui.style.display = 'flex'; ui.style.left = (rect.left + offX + gX * TILE) + 'px'; ui.style.top = (rect.top + offY + gY * TILE - 50) + 'px';
-                }
-            }
-        } else { 
-            // Now movement works even if holding a box!
-            p.tX = mx; 
-            p.tY = my; 
+function toggleBuildMode() {
+    gameState.mode = gameState.mode === 'PLAY' ? 'BUILD' : 'PLAY';
+    const badge = document.getElementById('mode-badge');
+    badge.innerText = gameState.mode + ' MODE';
+    badge.className = gameState.mode === 'BUILD' ? 'build' : '';
+    if (gameState.mode === 'PLAY') clearBuildState();
+}
+function openModal() {
+    refreshWorkerUI();
+    document.getElementById('office-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('office-overlay').classList.remove('open'); }
+function closeScratcher() {
+    scratchActive = false;
+    scratchCooldown = 5.0;
+    document.getElementById('scratcher-overlay').classList.remove('open');
+    sCtx.clearRect(0, 0, 280, 280);
+}
+function openScratcherModal() {
+    document.getElementById('scratcher-overlay').classList.add('open');
+}
+function confirmPlacement() {
+    if (gameState.movingObj) {
+        gameState.movingObj.gridX = Math.max(0, Math.min(gameState.tempPos.gX, COLS - gameState.movingObj.w));
+        gameState.movingObj.gridY = Math.max(0, Math.min(gameState.tempPos.gY, ROWS - gameState.movingObj.h));
+    }
+    clearBuildState(); saveGame();
+}
+function clearBuildState() { gameState.movingObj = null; gameState.isPlaced = false; document.getElementById('build-confirm').style.display = 'none'; }
+function resetGame() { if (confirm("Clear all data?")) { localStorage.removeItem('scratcherSimData'); location.reload(); } }
+
+window.addEventListener('mousemove', (e) => {
+    if (draggedObject) {
+        const worldPos = Camera.screenToWorld(e.clientX, e.clientY, canvas);
+        
+        // Snap the object's GRID position to the mouse world position
+        // We subtract half the width/height to center the object on the mouse
+        draggedObject.gridX = Math.floor((worldPos.x - offX - (draggedObject.w * TILE / 2)) / TILE);
+        draggedObject.gridY = Math.floor((worldPos.y - offY - (draggedObject.h * TILE / 2)) / TILE);
+    }
+});
+window.addEventListener('mousedown', (e) => {
+    const worldPos = Camera.screenToWorld(e.clientX, e.clientY, canvas);
+
+    if (e.target.tagName === 'BUTTON' || e.target.closest('#scratcher-container')) return;
+
+    // Only allow furniture dragging in BUILD mode
+    if (gameState.mode === 'BUILD') {
+        const hit = checkFurnitureHit(worldPos);
+        if (hit) {
+            draggedObject = hit;
+            Camera.isLocked = true;
+            return;
         }
     }
 });
+window.addEventListener('mouseup', (e) => {
+    // 1. RELEASE FURNITURE (always fires regardless of where mouse lifted)
+    if (draggedObject) {
+        draggedObject = null;
+        Camera.isLocked = false;
+        Camera.isDragging = false;
+        return;
+    }
+
+    // 2. SCRATCHER CLEANUP
+    isScratching = false;
+    lastX = null;
+    lastY = null;
+
+    // 3. GATE: only act on clicks that land on the game canvas itself.
+    //    Clicking buttons, bars or modals must never move the player.
+    if (e.target !== canvas) {
+        return;
+    }
+
+    // 4. CAMERA CHECK — dragging the map must not also move the player
+    if (Camera.hasMoved) {
+        Camera.isDragging = false;
+        return;
+    }
+
+    // 5. RIGHT CLICK — pickup/drop action (desktop)
+    if (e.button === 2 && gameState.mode === 'PLAY') {
+        triggerAction();
+        return;
+    }
+
+    // 6. PLAYER MOVEMENT — only in PLAY mode
+    if (e.button === 0 && gameState.mode === 'PLAY') { // Left Click
+        const worldPos = Camera.screenToWorld(e.clientX, e.clientY, canvas);
+        let p = gameState.player;
+
+        // Red Box (Register) Pathfinding Logic
+        const rx = offX + (gameState.counter.gridX - 1) * TILE;
+        const ry = offY + gameState.counter.gridY * TILE;
+        
+        if (worldPos.x > rx && worldPos.x < rx + TILE && 
+            worldPos.y > ry && worldPos.y < ry + (gameState.counter.h * TILE)) {
+            p.path = findPath(
+                Math.floor((p.x - offX) / TILE), 
+                Math.floor((p.y - offY) / TILE),
+                gameState.counter.gridX - 1, 
+                gameState.counter.gridY + 1
+            );
+        } else {
+            p.path = [];
+            p.tX = worldPos.x;
+            p.tY = worldPos.y;
+        }
+    }
+
+    Camera.isDragging = false;
+});
+
+// ── Touch furniture dragging (BUILD mode only) ──────────────────────────────
+// Mirrors the mouse drag handlers so furniture moves work on mobile too.
+canvas.addEventListener('touchstart', (e) => {
+    if (gameState.mode !== 'BUILD') return;
+    const touch = e.touches[0];
+    const worldPos = Camera.screenToWorld(touch.clientX, touch.clientY, canvas);
+    const hit = checkFurnitureHit(worldPos);
+    if (hit) {
+        draggedObject = hit;
+        Camera.isLocked = true;
+    }
+}, { passive: false });
+
+window.addEventListener('touchmove', (e) => {
+    if (!draggedObject) return;
+    const touch = e.touches[0];
+    const worldPos = Camera.screenToWorld(touch.clientX, touch.clientY, canvas);
+    draggedObject.gridX = Math.max(0, Math.min(Math.floor((worldPos.x - offX - (draggedObject.w * TILE / 2)) / TILE), COLS - draggedObject.w));
+    draggedObject.gridY = Math.max(0, Math.min(Math.floor((worldPos.y - offY - (draggedObject.h * TILE / 2)) / TILE), ROWS - draggedObject.h));
+    e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('touchend', () => {
+    if (draggedObject) {
+        draggedObject = null;
+        Camera.isLocked = false;
+    }
+});
+
+// ── Worker AI ────────────────────────────────────────────────────────────────
+function hireWorker() {
+    if (gameState.worker) return;
+    if (gameState.money < 200) { alert("Not enough cash! ($200 needed)"); return; }
+    gameState.money -= 200;
+    gameState.worker = {
+        x: offX + (gameState.counter.gridX + gameState.counter.w + 2) * TILE,
+        y: offY + (gameState.counter.gridY + gameState.counter.h / 2) * TILE,
+        tX: 0, tY: 0, angle: 0, speed: 130,
+        holding: 0, maxHolding: 50,
+        task: 'IDLE', state: 'IDLE', path: []
+    };
+    gameState.worker.tX = gameState.worker.x;
+    gameState.worker.tY = gameState.worker.y;
+    saveGame();
+    refreshWorkerUI();
+}
+
+function fireWorker() {
+    if (!confirm("Fire the worker?")) return;
+    gameState.worker = null;
+    saveGame();
+    refreshWorkerUI();
+}
+
+function assignWorker(task) {
+    if (!gameState.worker) return;
+    gameState.worker.task = task;
+    gameState.worker.state = task;
+    gameState.worker.path = [];
+    saveGame();
+    refreshWorkerUI();
+    closeModal();
+}
+
+function refreshWorkerUI() {
+    const w = gameState.worker;
+    document.getElementById('hire-row').style.display = w ? 'none' : 'flex';
+    document.getElementById('worker-tasks').style.display = w ? 'block' : 'none';
+    if (w) {
+        const labels = { IDLE: '☕ Resting', MANNING_REGISTER: '🧾 On Register', STOCKING: '📦 Stocking Shelves', FETCHING_CRATE: '🚶 Fetching Crate' };
+        document.getElementById('worker-status-label').innerText = labels[w.task] || w.task;
+        ['task-register', 'task-stock', 'task-idle', 'task-fire'].forEach(id => document.getElementById(id).classList.remove('active'));
+        const taskMap = { 'MANNING_REGISTER': 'task-register', 'STOCKING': 'task-stock', 'IDLE': 'task-idle' };
+        if (taskMap[w.task]) document.getElementById(taskMap[w.task]).classList.add('active');
+    }
+}
+
+function updateWorker(dt) {
+    const w = gameState.worker;
+    if (!w || gameState.mode !== 'PLAY') return;
+
+    // ── Movement ──
+    if (w.path && w.path.length > 0) {
+        const node = w.path[0];
+        w.tX = offX + (node.x + 0.5) * TILE;
+        w.tY = offY + (node.y + 0.5) * TILE;
+        if (Math.hypot(w.x - w.tX, w.y - w.tY) < 8) {
+            w.path.shift();
+            if (w.path.length === 0) { w.x = w.tX; w.y = w.tY; }
+        }
+    }
+    const dx = w.tX - w.x, dy = w.tY - w.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 2) {
+        const spd = w.speed * dt;
+        const vx = (dx / dist) * spd, vy = (dy / dist) * spd;
+        if (!checkCollision(w.x + vx, w.y, true)) w.x += vx;
+        if (!checkCollision(w.x, w.y + vy, true)) w.y += vy;
+        w.angle = Math.atan2(dy, dx);
+        // Save relative position
+        w.relX = (w.x - offX) / TILE;
+        w.relY = (w.y - offY) / TILE;
+    }
+
+    // ── Task: Man Register ──
+    if (w.task === 'MANNING_REGISTER') {
+        const regX = offX + (gameState.counter.gridX - 0.5) * TILE;
+        const regY = offY + (gameState.counter.gridY + 1) * TILE;
+        if (Math.hypot(w.x - regX, w.y - regY) > 20) {
+            w.tX = regX; w.tY = regY;
+        }
+    }
+
+    // ── Task: Stocking (state machine) ──
+    if (w.task === 'STOCKING') {
+        if (w.holding === 0) {
+            // Find a crate to fetch
+            if (gameState.deliveries.length > 0) {
+                w.state = 'FETCHING_CRATE';
+                const crate = gameState.deliveries[0];
+                const crateX = offX + crate.gX * TILE;
+                const crateY = offY + crate.gY * TILE;
+                w.tX = crateX; w.tY = crateY;
+                if (Math.hypot(w.x - crateX, w.y - crateY) < TILE * 1.2) {
+                    let space = w.maxHolding - w.holding;
+                    let take = Math.min(crate.qty, space);
+                    w.holding += take;
+                    crate.qty -= take;
+                    if (crate.qty <= 0) gameState.deliveries.splice(0, 1);
+                    saveGame();
+                }
+            } else {
+                w.state = 'IDLE'; // No crates, chill
+            }
+        } else {
+            // Find the shelf that needs stock most
+            w.state = 'STOCKING';
+            const shelf = gameState.shelves.reduce((a, b) => (a.max - a.stock) > (b.max - b.stock) ? a : b);
+            if (shelf.stock < shelf.max) {
+                const sX = offX + (shelf.gridX - 0.8) * TILE;
+                const sY = offY + (shelf.gridY + shelf.h / 2) * TILE;
+                w.tX = sX; w.tY = sY;
+                if (Math.hypot(w.x - sX, w.y - sY) < TILE * 1.5) {
+                    const stockAmt = Math.min(w.holding, shelf.max - shelf.stock);
+                    shelf.stock += stockAmt;
+                    w.holding -= stockAmt;
+                    saveGame();
+                }
+            } else {
+                w.holding = 0; // All full
+            }
+        }
+    }
+}
+
+// ── Add Shelf ────────────────────────────────────────────────────────────────
+function addShelf() {
+    if (gameState.money < 100) { alert("Not enough cash! ($100 needed)"); return; }
+    gameState.money -= 100;
+    // Place new shelf offset from existing ones
+    const lastShelf = gameState.shelves[gameState.shelves.length - 1];
+    const newGX = Math.min(lastShelf.gridX + 2, COLS - 1);
+    const newGY = Math.max(0, Math.min(lastShelf.gridY, ROWS - 4));
+    gameState.shelves.push({ gridX: newGX, gridY: newGY, w: 1, h: 4, stock: 0, max: 100, type: 'shelf', isDragging: false });
+    saveGame();
+    closeModal();
+}
+
+// ── Expand Room ──────────────────────────────────────────────────────────────
+function expandRoom() {
+    if (gameState.money < 300) { alert("Not enough cash! ($300 needed)"); return; }
+    gameState.money -= 300;
+    gameState.roomRows += 4;
+    saveGame();
+    resize(); // recompute layout with new room height
+    closeModal();
+}
 
 loadGame(); resize();
 requestAnimationFrame(loop);
@@ -1061,7 +1551,7 @@ function triggerAction() {
 function openScratcher() {
     scratchActive = true;
     document.getElementById('btn-scratch').style.display = 'none';
-    document.getElementById('scratcher-modal').style.display = 'block';
+    openScratcherModal();
     
     // 1. Clear previous symbols and generate new ones
     const results = [];
@@ -1164,55 +1654,33 @@ function getTouchPos(e) {
 }
 
 //1. The A* Pathfinding Logic. This finds the shortest path while treating tiles with furniture as "blocked".
-function findPath(startG, targetG) {
-    const openList = [{ ...startG, g: 0, h: 0, f: 0, parent: null }];
-    const closedList = new Set();
-    
-    // Create a 2D array of blocked tiles
-    const grid = Array(ROWS).fill().map(() => Array(COLS).fill(false));
-    [gameState.counter, ...gameState.shelves].forEach(obj => {
-        for(let x = obj.gridX; x < obj.gridX + obj.w; x++) {
-            for(let y = obj.gridY; y < obj.gridY + obj.h; y++) {
-                if (x >= 0 && x < COLS && y >= 0 && y < ROWS) grid[y][x] = true;
+function findPath(startGX, startGY, endGX, endGY) {
+    const queue = [[{ x: startGX, y: startGY }]];
+    const visited = new Set();
+    visited.add(`${startGX},${startGY}`);
+
+    while (queue.length > 0) {
+        const path = queue.shift();
+        const { x, y } = path[path.length - 1];
+
+        if (x === endGX && y === endGY) return path;
+
+        // Check 4 neighbors
+        [[0,1], [0,-1], [1,0], [-1,0]].forEach(([dx, dy]) => {
+            const nx = x + dx, ny = y + dy;
+            const key = `${nx},${ny}`;
+
+            // 1. Stay in bounds. 2. Not visited. 3. Use your existing checkCollision
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && !visited.has(key)) {
+                // Convert grid to world pixels to test collision
+                if (!checkCollision(offX + nx * TILE + 20, offY + ny * TILE + 20)) {
+                    visited.add(key);
+                    queue.push([...path, { x: nx, y: ny }]);
+                }
             }
-        }
-    });
-
-    while (openList.length > 0) {
-        // Get node with lowest F score
-        openList.sort((a, b) => a.f - b.f);
-        const current = openList.shift();
-        const key = `${current.x},${current.y}`;
-        
-        if (current.x === targetG.x && current.y === targetG.y) {
-            const path = [];
-            let curr = current;
-            while (curr) { path.push({ x: curr.x, y: curr.y }); curr = curr.parent; }
-            return path.reverse();
-        }
-
-        closedList.add(key);
-
-        const neighbors = [
-            { x: current.x + 1, y: current.y }, { x: current.x - 1, y: current.y },
-            { x: current.x, y: current.y + 1 }, { x: current.x, y: current.y - 1 }
-        ];
-
-        for (let n of neighbors) {
-            if (n.x < 0 || n.x >= COLS || n.y < 0 || n.y >= ROWS || grid[n.y][n.x] || closedList.has(`${n.x},${n.y}`)) continue;
-            
-            const gScore = current.g + 1;
-            const hScore = Math.abs(n.x - targetG.x) + Math.abs(n.y - targetG.y);
-            const newNode = { ...n, g: gScore, h: hScore, f: gScore + hScore, parent: current };
-            
-            const existing = openList.find(o => o.x === n.x && o.y === n.y);
-            if (!existing || gScore < existing.g) {
-                if (!existing) openList.push(newNode);
-                else Object.assign(existing, newNode);
-            }
-        }
+        });
     }
-    return null; // No path found
+    return null;
 }
 
 document.getElementById('btn-scratch').addEventListener('click', () => {
@@ -1224,102 +1692,78 @@ document.getElementById('btn-scratch').addEventListener('click', () => {
 });
 
 // Handle single-touch for movement and multi-touch for action
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    const pos = getTouchPos(e);
-    const gX = Math.floor((pos.x - offX) / TILE);
-    const gY = Math.floor((pos.y - offY) / TILE);
 
-    if (gameState.mode === 'BUILD') {
-        // 1. SELECTING AN OBJECT
-        if (!gameState.movingObj) {
-            // Check Counter
-            if (gX === gameState.counter.gridX && gY >= gameState.counter.gridY && gY < gameState.counter.gridY + gameState.counter.h) {
-                gameState.movingObj = gameState.counter;
-            }
-            // Check Shelves
-            gameState.shelves.forEach(s => {
-                if (gX === s.gridX && gY >= s.gridY && gY < s.gridY + s.h) gameState.movingObj = s;
-            });
-        } 
-        // 2. PLACING THE OBJECT
-        else if (!gameState.isPlaced) {
-            // Ensure placement is within bounds and not blocking the door
-            if (gX >= 0 && gX + gameState.movingObj.w <= COLS && gY >= 0 && gY + gameState.movingObj.h <= ROWS && !(gX < 5 && gY < 3)) {
-                gameState.tempPos = { gX, gY };
-                gameState.isPlaced = true;
-                
-                // Show the UI buttons at the touch location
-                const ui = document.getElementById('build-confirm');
-                ui.style.display = 'flex';
-                ui.style.left = pos.x + 'px';
-                ui.style.top = (pos.y - 60) + 'px';
-            }
-        }
-    } else {
-        // REGULAR PLAY MODE: Handle movement and actions
-        if (e.touches.length > 1) {
-            triggerAction();
-        } else {
-            const p = gameState.player;
-            // 1. Calculate the Counter's interaction zone (Red Box)
-            const rx = gameState.counter.gridX - 1;
-            const ry = gameState.counter.gridY;
-            
-            // 2. Check if the touch landed inside the red box
-            if (gX === rx && gY >= ry && gY < ry + gameState.counter.h) {
-                const startG = { 
-                    x: Math.floor((p.x - offX) / TILE), 
-                    y: Math.floor((p.y - offY) / TILE) 
-                };
-                const targetG = { x: gX, y: gY };
-                
-                // 3. Trigger the A* pathfinder (Make sure findPath function is added!)
-                const newPath = findPath(startG, targetG);
-                if (newPath) {
-                    p.path = newPath;
-                }
-            } else {
-                // Manual touch movement - Clear path and go to specific point
-                p.path = []; 
-                p.tX = pos.x;
-                p.tY = pos.y;
-            }
-        }
-    }
-}, { passive: false });
-
-// Update mouse/touch position for the "Ghost" furniture preview
-canvas.addEventListener('touchmove', (e) => {
-    if (gameState.mode === 'BUILD' && gameState.movingObj && !gameState.isPlaced) {
-        const pos = getTouchPos(e);
-        gameState.mouse.x = pos.x;
-        gameState.mouse.y = pos.y;
-    }
-}, { passive: false });
 
 // 2. Updated Event Listeners
 // Mouse Listeners
-sCanvas.addEventListener('mousedown', (e) => {
-    isScratching = true;
-    const rect = sCanvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
-});
-window.addEventListener('mouseup', () => { isScratching = false; lastX = null; lastY = null; });
+
+
+// ── Scratch card event listeners ─────────────────────────────────────────────
+// Mouse
+sCanvas.addEventListener('mousedown', () => { isScratching = true; lastX = null; lastY = null; });
 sCanvas.addEventListener('mousemove', handleScratch);
+sCanvas.addEventListener('mouseup',   () => { isScratching = false; lastX = null; lastY = null; });
+sCanvas.addEventListener('mouseleave',() => { isScratching = false; lastX = null; lastY = null; });
+
+// Touch
+sCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    isScratching = true;
+    lastX = null; lastY = null;
+}, { passive: false });
+sCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    handleScratch(e);
+}, { passive: false });
+sCanvas.addEventListener('touchend', () => { isScratching = false; lastX = null; lastY = null; });
 
 // Touch Listeners
-sCanvas.addEventListener('touchstart', (e) => {
-    isScratching = true;
-    const rect = sCanvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    lastX = touch.clientX - rect.left;
-    lastY = touch.clientY - rect.top;
-    handleScratch(e);
-}, {passive: false});
-sCanvas.addEventListener('touchmove', handleScratch, {passive: false});
-sCanvas.addEventListener('touchend', () => { isScratching = false; lastX = null; lastY = null; });
+
+window.addEventListener('touchend', (e) => {
+
+    // 1. GATE: Ignore if tapping the Top Bar or a Button
+    if (e.target.closest('#top-bar') || e.target.closest('button')) {
+        return; 
+    }
+
+    // 2. If the camera was dragged (or a furniture drag just ended), STOP
+    if (isScratching || Camera.dragDistance > 15) {
+        Camera.dragDistance = 0;
+        Camera.isLocked = false; // Release any furniture lock
+        return; 
+    }
+
+    // 3. In BUILD mode, taps move furniture — not the player
+    if (gameState.mode === 'BUILD') {
+        Camera.dragDistance = 0;
+        return;
+    }
+
+    // 4. Clean tap in PLAY mode — move the player
+    const touch = e.changedTouches[0];
+    const worldPos = Camera.screenToWorld(touch.clientX, touch.clientY, canvas);
+    let p = gameState.player;
+
+    // Red Box / Pathfinding logic (mirrors mouseup)
+    const rx = offX + (gameState.counter.gridX - 1) * TILE;
+    const ry = offY + gameState.counter.gridY * TILE;
+    
+    if (worldPos.x > rx && worldPos.x < rx + TILE && worldPos.y > ry && worldPos.y < ry + (gameState.counter.h * TILE)) {
+        p.path = findPath(
+            Math.floor((p.x - offX) / TILE), 
+            Math.floor((p.y - offY) / TILE),
+            gameState.counter.gridX - 1, 
+            gameState.counter.gridY + 1
+        );
+    } else {
+        p.path = [];
+        p.tX = worldPos.x;
+        p.tY = worldPos.y;
+    }
+    
+    Camera.dragDistance = 0;
+    Camera.isDragging = false;
+});
 
 // Prevent customer bunching when returning to the tab
 document.addEventListener("visibilitychange", () => {
@@ -1336,7 +1780,7 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-let spawnInterval = setInterval(() => { if(gameState.customers.length < 8) console.log("Checking spawn timer..."); spawnCustomer(); }, 3500);
+let spawnInterval = setInterval(() => { if (gameState.customers.length < 8) spawnCustomer(); }, 3500);
 </script>
 </body>
 </html>
