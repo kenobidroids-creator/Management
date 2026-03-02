@@ -29,9 +29,9 @@ html {
 }
 
 body {
-    position: fixed;
     width: 100%;
-    height: 100%;
+    height: 100dvh; /* dynamic viewport height — accounts for browser chrome on iOS */
+    height: 100vh;  /* fallback for older browsers */
     overflow: hidden;
     background: var(--bg);
     font-family: 'Segoe UI', system-ui, sans-serif;
@@ -542,9 +542,10 @@ function updateCustomers(dt) {
             
             const pos = shelfQueue.indexOf(c);
 
-            // Target the floor tile to the left of the shelf, vertically centred on it
+            // Approach from the left at mid-shelf height; queue members spread downward
+            const shelfMidY = offY + (shelf.gridY + shelf.h / 2) * TILE;
             c.tX = offX + (shelf.gridX - 0.8) * TILE;
-            c.tY = offY + (shelf.gridY + shelf.h / 2) * TILE + (pos * 35);
+            c.tY = shelfMidY + (pos * 38);
 
             const dist = Math.hypot(c.x - c.tX, c.y - c.tY);
             
@@ -955,33 +956,45 @@ function loop(timestamp) {
     }
         
         
-        // Interaction Logic (Shelves/Restocking)
-        const s = gameState.shelves[0];
-        const shelfZone = { 
-            x: offX + (s.gridX - 1) * TILE, 
-            y: offY + s.gridY * TILE, 
-            w: TILE, 
-            h: s.h * TILE 
-        };
+        // Interaction Logic — check all shelves for restocking and scratch availability
+        const scratchBtn = document.getElementById('btn-scratch');
+        let nearAnyShelf = false;
+        let restockingShelf = null;
 
-        if (isInZone(p.x, p.y, shelfZone)) {
-            const scratchBtn = document.getElementById('btn-scratch');
-            if (p.holding > 0) {
-                restockTimer += dt;
-                scratchBtn.style.display = 'none';
-                if (restockTimer > 0.05 && s.stock < s.max) {
-                    s.stock++; 
-                    p.holding--; 
-                    restockTimer = 0;
-                    if (p.holding === 0 || s.stock >= s.max) saveGame();
+        gameState.shelves.forEach(s => {
+            const shelfZone = {
+                x: offX + (s.gridX - 1) * TILE,
+                y: offY + s.gridY * TILE,
+                w: TILE,
+                h: s.h * TILE
+            };
+            if (isInZone(p.x, p.y, shelfZone)) {
+                nearAnyShelf = true;
+                if (p.holding > 0 && s.stock < s.max) {
+                    restockingShelf = s;
                 }
-            } else if (s.stock > 0 && !scratchActive) {
-                scratchBtn.style.display = 'block';
-            } else {
-                scratchBtn.style.display = 'none';
             }
+        });
+
+        if (restockingShelf) {
+            scratchBtn.style.display = 'none';
+            restockTimer += dt;
+            if (restockTimer > 0.05) {
+                restockingShelf.stock++;
+                p.holding--;
+                restockTimer = 0;
+                if (p.holding === 0 || restockingShelf.stock >= restockingShelf.max) saveGame();
+            }
+        } else if (nearAnyShelf && p.holding === 0) {
+            // Show SCRATCH if any nearby shelf has stock
+            const anyStocked = gameState.shelves.some(s => {
+                const shelfZone = { x: offX + (s.gridX - 1) * TILE, y: offY + s.gridY * TILE, w: TILE, h: s.h * TILE };
+                return isInZone(p.x, p.y, shelfZone) && s.stock > 0;
+            });
+            scratchBtn.style.display = (anyStocked && !scratchActive) ? 'block' : 'none';
         } else {
-            document.getElementById('btn-scratch').style.display = 'none';
+            scratchBtn.style.display = 'none';
+            restockTimer = 0;
         }
 
         // PICKUP button: show on mobile when a crate is within reach and player isn't already holding max
@@ -1211,8 +1224,9 @@ function resize() {
                 .filter(cust => (cust.state === 'TO_SHELF' || cust.state === 'PICKING') && cust.targetShelf === shelf)
                 .sort((a, b) => a.queueTime - b.queueTime);
             const pos = shelfQueue.indexOf(c);
+            const shelfMidY = offY + (shelf.gridY + shelf.h / 2) * TILE;
             c.tX = offX + (shelf.gridX - 0.8) * TILE;
-            c.tY = offY + (shelf.gridY + shelf.h / 2) * TILE + (pos * 35);
+            c.tY = shelfMidY + (pos * 38);
         } else if (c.state === 'WAITING') {
             const payQueue = gameState.customers
                 .filter(cust => cust.state === 'WAITING')
@@ -1657,15 +1671,21 @@ function handleScratch(e) {
 }
 
 function checkScratchWin() {
-    const s = gameState.shelves[0];
+    // Deduct from whichever stocked shelf the player is standing near
+    const p = gameState.player;
+    const nearShelf = gameState.shelves.find(s => {
+        const shelfZone = { x: offX + (s.gridX - 1) * TILE, y: offY + s.gridY * TILE, w: TILE, h: s.h * TILE };
+        return isInZone(p.x, p.y, shelfZone) && s.stock > 0;
+    }) || gameState.shelves[0];
+
     const data = sCtx.getImageData(0,0,280,280).data;
     let trans = 0;
     for(let i=3; i<data.length; i+=4) if(data[i] === 0) trans++;
     
     // Threshold: 60% revealed
     if ((trans / (280*280)) > 0.60) {
-        scratchActive = false; // Prevent further scratching
-        s.stock--;
+        scratchActive = false;
+        nearShelf.stock--;
         setTimeout(() => {
             if (currentPendingWin > 0) {
                 gameState.money += currentPendingWin;
@@ -1677,13 +1697,6 @@ function checkScratchWin() {
             closeScratcher();
         }, 500);
     }
-}
-
-function closeScratcher() {
-    scratchActive = false;
-    scratchCooldown = 5.0;
-    document.getElementById('scratcher-modal').style.display = 'none';
-    sCtx.clearRect(0,0,280,280);
 }
 
 // NEW: Helper to convert screen touch to game grid coordinates
