@@ -26,12 +26,12 @@
 html {
     height: 100%;
     overflow: hidden;
-    position: fixed;
-    width: 100%;
 }
 
 body {
-    height: calc(var(--vh, 1vh) * 100);
+    position: fixed;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     background: var(--bg);
     font-family: 'Segoe UI', system-ui, sans-serif;
@@ -542,9 +542,9 @@ function updateCustomers(dt) {
             
             const pos = shelfQueue.indexOf(c);
 
-            // Target the floor tile in front of the shelf
+            // Target the floor tile to the left of the shelf, vertically centred on it
             c.tX = offX + (shelf.gridX - 0.8) * TILE;
-            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
+            c.tY = offY + (shelf.gridY + shelf.h / 2) * TILE + (pos * 35);
 
             const dist = Math.hypot(c.x - c.tX, c.y - c.tY);
             
@@ -877,8 +877,17 @@ function draw() {
     // });
 
     if (transactionTimer > 0) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(p.x - 20, p.y - 30, 40, 6);
-        ctx.fillStyle = "#4CAF50"; ctx.fillRect(p.x - 20, p.y - 30, (transactionTimer/1.5) * 40, 6);
+        // Draw bar above whoever is processing — worker if manning register, else player
+        const w = gameState.worker;
+        const workerProcessing = w && w.task === 'MANNING_REGISTER';
+        const barX = workerProcessing
+            ? offX + (gameState.counter.gridX - 1) * TILE + TILE / 2
+            : p.x;
+        const barY = workerProcessing
+            ? offY + gameState.counter.gridY * TILE - 10
+            : p.y - 30;
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(barX - 20, barY, 40, 6);
+        ctx.fillStyle = "#4CAF50";         ctx.fillRect(barX - 20, barY, (transactionTimer / 1.5) * 40, 6);
     }
     
     document.getElementById('ui-cash').innerText = `$${gameState.money}`;
@@ -1203,7 +1212,7 @@ function resize() {
                 .sort((a, b) => a.queueTime - b.queueTime);
             const pos = shelfQueue.indexOf(c);
             c.tX = offX + (shelf.gridX - 0.8) * TILE;
-            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
+            c.tY = offY + (shelf.gridY + shelf.h / 2) * TILE + (pos * 35);
         } else if (c.state === 'WAITING') {
             const payQueue = gameState.customers
                 .filter(cust => cust.state === 'WAITING')
