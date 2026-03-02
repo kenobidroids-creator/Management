@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -21,165 +22,168 @@
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-        height: calc(var(--vh, 1vh) * 100);
-        overflow: hidden;
-        background: var(--bg);
-        font-family: 'Segoe UI', system-ui, sans-serif;
-        touch-action: none;
-        display: flex;
-        flex-direction: column;
-        -webkit-user-select: none;
-        color: var(--text);
-    }
+```
+body {
+    height: calc(var(--vh, 1vh) * 100);
+    overflow: hidden;
+    background: var(--bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    -webkit-user-select: none;
+    color: var(--text);
+}
 
-    /* ── Top Bar ── */
-    #top-bar {
-        height: 52px;
-        background: var(--surface);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0 16px;
-        border-bottom: 1px solid var(--border);
-        flex-shrink: 0;
-        gap: 12px;
-    }
-    .top-stat {
-        display: flex; align-items: center; gap: 6px;
-        font-size: 13px; font-weight: 600; color: var(--muted);
-    }
-    .top-stat b { color: var(--text); font-size: 15px; }
-    #mode-badge {
-        font-size: 11px; font-weight: 700; letter-spacing: 1px;
-        padding: 3px 10px; border-radius: 20px;
-        background: rgba(249,115,22,0.15); color: var(--warning);
-        border: 1px solid rgba(249,115,22,0.3);
-        transition: all 0.2s;
-    }
-    #mode-badge.build { background: rgba(168,85,247,0.15); color: var(--purple); border-color: rgba(168,85,247,0.3); }
+/* ── Top Bar ── */
+#top-bar {
+    height: 52px;
+    background: var(--surface);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 12px;
+}
+.top-stat {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+}
+.top-stat b { color: var(--text); font-size: 15px; }
+#mode-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 20px;
+    background: rgba(249,115,22,0.15); color: var(--warning);
+    border: 1px solid rgba(249,115,22,0.3);
+    transition: all 0.2s;
+}
+#mode-badge.build { background: rgba(168,85,247,0.15); color: var(--purple); border-color: rgba(168,85,247,0.3); }
 
-    /* ── Canvas ── */
-    #gameCanvas { flex-grow: 1; display: block; width: 100%; background: var(--bg); }
+/* ── Canvas ── */
+#gameCanvas { flex-grow: 1; display: block; width: 100%; background: var(--bg); }
 
-    /* ── Bottom Bar ── */
-    #bottom-bar {
-        height: 72px;
-        background: var(--surface);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 10px;
-        flex-shrink: 0;
-        padding: 0 12px;
-        padding-bottom: env(safe-area-inset-bottom);
-        border-top: 1px solid var(--border);
-    }
+/* ── Bottom Bar ── */
+#bottom-bar {
+    height: 72px;
+    background: var(--surface);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--border);
+}
 
-    /* ── Buttons ── */
-    .btn {
-        padding: 9px 14px; border: none; border-radius: 10px;
-        color: white; cursor: pointer; font-weight: 700;
-        font-size: 12px; letter-spacing: 0.5px;
-        transition: opacity 0.15s, transform 0.1s;
-        min-width: 64px; white-space: nowrap;
-    }
-    .btn:active { transform: scale(0.95); opacity: 0.85; }
-    .btn-primary  { background: var(--primary); }
-    .btn-accent   { background: var(--accent); }
-    .btn-danger   { background: var(--danger); }
-    .btn-warning  { background: var(--warning); }
-    .btn-purple   { background: var(--purple); }
-    .btn-surface  { background: var(--surface2); border: 1px solid var(--border); }
-    .btn-build    { background: #e91e63; }
-    .btn-confirm  { background: var(--accent); }
-    .btn-cancel   { background: var(--danger); }
-    .btn-action   { background: var(--warning); }
-    .btn-sm       { padding: 6px 10px; font-size: 11px; min-width: 0; }
-    .btn-block    { width: 100%; margin-top: 8px; }
+/* ── Buttons ── */
+.btn {
+    padding: 9px 14px; border: none; border-radius: 10px;
+    color: white; cursor: pointer; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.5px;
+    transition: opacity 0.15s, transform 0.1s;
+    min-width: 64px; white-space: nowrap;
+}
+.btn:active { transform: scale(0.95); opacity: 0.85; }
+.btn-primary  { background: var(--primary); }
+.btn-accent   { background: var(--accent); }
+.btn-danger   { background: var(--danger); }
+.btn-warning  { background: var(--warning); }
+.btn-purple   { background: var(--purple); }
+.btn-surface  { background: var(--surface2); border: 1px solid var(--border); }
+.btn-build    { background: #e91e63; }
+.btn-confirm  { background: var(--accent); }
+.btn-cancel   { background: var(--danger); }
+.btn-action   { background: var(--warning); }
+.btn-sm       { padding: 6px 10px; font-size: 11px; min-width: 0; }
+.btn-block    { width: 100%; margin-top: 8px; }
 
-    /* ── Modals ── */
-    .modal-overlay {
-        display: none; position: fixed; inset: 0;
-        background: rgba(0,0,0,0.6); z-index: 190;
-    }
-    .modal-overlay.open { display: block; }
-    .modal-box {
-        position: fixed; top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 200; width: 92%; max-width: 400px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 25px 60px rgba(0,0,0,0.5);
-    }
-    .modal-title {
-        font-size: 17px; font-weight: 700; margin-bottom: 16px;
-        display: flex; align-items: center; gap: 8px;
-    }
-    .modal-section {
-        background: var(--surface2); border-radius: 10px;
-        padding: 12px 14px; margin-bottom: 10px;
-    }
-    .modal-section-title {
-        font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-        color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
-    }
-    .modal-row {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 4px 0; font-size: 13px; gap: 8px;
-    }
-    .modal-row .label { color: var(--muted); }
-    .modal-row .value { font-weight: 600; }
-    .worker-task-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    }
-    .task-btn {
-        padding: 10px 8px; border-radius: 10px; border: 2px solid transparent;
-        background: var(--bg); cursor: pointer; color: var(--muted);
-        font-size: 11px; font-weight: 700; text-align: center;
-        transition: all 0.15s;
-    }
-    .task-btn .task-icon { font-size: 20px; display: block; margin-bottom: 4px; }
-    .task-btn:hover { border-color: var(--border); color: var(--text); }
-    .task-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(59,130,246,0.1); }
-    .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+/* ── Modals ── */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 190;
+}
+.modal-overlay.open { display: block; }
+.modal-box {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200; width: 92%; max-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+}
+.modal-title {
+    font-size: 17px; font-weight: 700; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+}
+.modal-section {
+    background: var(--surface2); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px;
+}
+.modal-section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 8px;
+}
+.modal-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0; font-size: 13px; gap: 8px;
+}
+.modal-row .label { color: var(--muted); }
+.modal-row .value { font-weight: 600; }
+.worker-task-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.task-btn {
+    padding: 10px 8px; border-radius: 10px; border: 2px solid transparent;
+    background: var(--bg); cursor: pointer; color: var(--muted);
+    font-size: 11px; font-weight: 700; text-align: center;
+    transition: all 0.15s;
+}
+.task-btn .task-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.task-btn:hover { border-color: var(--border); color: var(--text); }
+.task-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(59,130,246,0.1); }
+.divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
 
-    /* ── Build confirm ── */
-    #build-confirm {
-        display: none; position: fixed;
-        bottom: 82px; left: 50%; transform: translateX(-50%);
-        gap: 10px; z-index: 100; background: var(--surface);
-        padding: 10px 16px; border-radius: 12px;
-        border: 1px solid var(--border);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-    }
+/* ── Build confirm ── */
+#build-confirm {
+    display: none; position: fixed;
+    bottom: 82px; left: 50%; transform: translateX(-50%);
+    gap: 10px; z-index: 100; background: var(--surface);
+    padding: 10px 16px; border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
 
-    /* ── Scratcher ── */
-    #scratch-container {
-        position: relative; width: 280px; height: 280px;
-        margin: 10px auto; border-radius: 12px; overflow: hidden;
-        border: 2px solid var(--border);
-    }
-    .prize-grid {
-        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-        width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
-        background: white;
-    }
-    .prize-cell {
-        display: flex; align-items: center; justify-content: center;
-        font-size: 3rem; color: #333 !important;
-        border: 1px solid #f0f0f0;
-    }
-    #scratch-canvas {
-        position: absolute; top: 0; left: 0; z-index: 10;
-        background: transparent !important; touch-action: none;
-    }
+/* ── Scratcher ── */
+#scratch-container {
+    position: relative; width: 280px; height: 280px;
+    margin: 10px auto; border-radius: 12px; overflow: hidden;
+    border: 2px solid var(--border);
+}
+.prize-grid {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
+    background: white;
+}
+.prize-cell {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3rem; color: #333 !important;
+    border: 1px solid #f0f0f0;
+}
+#scratch-canvas {
+    position: absolute; top: 0; left: 0; z-index: 10;
+    background: transparent !important; touch-action: none;
+}
 
-    canvas { display: block; }
-    body { touch-action: none; -webkit-user-select: none; }
-    </style>
+canvas { display: block; }
+body { touch-action: none; -webkit-user-select: none; }
+</style>
+```
+
 </head>
 <body>
     <!-- Top Bar -->
@@ -189,105 +193,107 @@
         <div class="top-stat">📦 <b id="ui-held">0</b></div>
     </div>
 
-    <!-- Canvas -->
-    <canvas id="gameCanvas"></canvas>
+```
+<!-- Canvas -->
+<canvas id="gameCanvas"></canvas>
 
-    <!-- Bottom Bar -->
-    <div id="bottom-bar">
-        <button class="btn btn-build"    id="build-toggle"  onclick="toggleBuildMode()">🔨 BUILD</button>
-        <button class="btn btn-action"   id="action-btn"    onclick="triggerAction()">⚡ ACTION</button>
-        <button id="btn-scratch" class="btn btn-accent"     style="display:none">🎟 SCRATCH</button>
-        <button id="btn-pickup"  class="btn btn-warning"    style="display:none" onclick="triggerAction()">📦 PICKUP</button>
-        <button class="btn btn-primary"                     onclick="openModal()">🏢 OFFICE</button>
-    </div>
+<!-- Bottom Bar -->
+<div id="bottom-bar">
+    <button class="btn btn-build"    id="build-toggle"  onclick="toggleBuildMode()">🔨 BUILD</button>
+    <button class="btn btn-action"   id="action-btn"    onclick="triggerAction()">⚡ ACTION</button>
+    <button id="btn-scratch" class="btn btn-accent"     style="display:none">🎟 SCRATCH</button>
+    <button id="btn-pickup"  class="btn btn-warning"    style="display:none" onclick="triggerAction()">📦 PICKUP</button>
+    <button class="btn btn-primary"                     onclick="openModal()">🏢 OFFICE</button>
+</div>
 
-    <!-- Build confirm overlay -->
-    <div id="build-confirm" style="display:none; flex-direction:row;">
-        <button class="btn btn-confirm" onclick="confirmPlacement()">✓ Place</button>
-        <button class="btn btn-cancel"  onclick="clearBuildState()">✕ Cancel</button>
-    </div>
+<!-- Build confirm overlay -->
+<div id="build-confirm" style="display:none; flex-direction:row;">
+    <button class="btn btn-confirm" onclick="confirmPlacement()">✓ Place</button>
+    <button class="btn btn-cancel"  onclick="clearBuildState()">✕ Cancel</button>
+</div>
 
-    <!-- Office Modal Overlay -->
-    <div class="modal-overlay" id="office-overlay" onclick="if(event.target===this)closeModal()">
-        <div class="modal-box" id="modal" style="display:block">
-            <div class="modal-title">🏢 Office</div>
+<!-- Office Modal Overlay -->
+<div class="modal-overlay" id="office-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box" id="modal" style="display:block">
+        <div class="modal-title">🏢 Office</div>
 
-            <!-- Inventory -->
-            <div class="modal-section">
-                <div class="modal-section-title">📦 Inventory</div>
-                <div class="modal-row">
-                    <span class="label">Order a stock crate</span>
-                    <button class="btn btn-accent btn-sm" onclick="buyStock()">Buy $50</button>
-                </div>
-            </div>
-
-            <!-- Shop -->
-            <div class="modal-section">
-                <div class="modal-section-title">🏗 Shop</div>
-                <div class="modal-row">
-                    <span class="label">Add a new shelf</span>
-                    <button class="btn btn-primary btn-sm" onclick="addShelf()">Add $100</button>
-                </div>
-                <div class="modal-row" style="margin-top:6px">
-                    <span class="label">Expand room downward</span>
-                    <button class="btn btn-purple btn-sm" onclick="expandRoom()">Expand $300</button>
-                </div>
-            </div>
-
-            <!-- Staff -->
-            <div class="modal-section" id="staff-section">
-                <div class="modal-section-title">👷 Staff</div>
-                <div id="hire-row" class="modal-row">
-                    <span class="label">Hire a worker</span>
-                    <button class="btn btn-warning btn-sm" onclick="hireWorker()">Hire $200</button>
-                </div>
-                <div id="worker-tasks" style="display:none">
-                    <div class="modal-row" style="margin-bottom:8px">
-                        <span class="label">Worker status:</span>
-                        <span class="value" id="worker-status-label">Idle</span>
-                    </div>
-                    <div class="worker-task-grid">
-                        <button class="task-btn" id="task-register" onclick="assignWorker('MANNING_REGISTER')">
-                            <span class="task-icon">🧾</span>Man Register
-                        </button>
-                        <button class="task-btn" id="task-stock" onclick="assignWorker('STOCKING')">
-                            <span class="task-icon">📦</span>Stock Shelves
-                        </button>
-                        <button class="task-btn" id="task-idle" onclick="assignWorker('IDLE')">
-                            <span class="task-icon">☕</span>Rest
-                        </button>
-                        <button class="task-btn" id="task-fire" onclick="fireWorker()" style="border-color:#ef4444;color:#ef4444">
-                            <span class="task-icon">🔥</span>Fire Worker
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <hr class="divider">
-
-            <!-- Danger zone -->
-            <div style="display:flex; gap:8px">
-                <button class="btn btn-danger btn-sm" style="flex:1" onclick="resetGame()">⚠ Reset</button>
-                <button class="btn btn-surface btn-sm" style="flex:1" onclick="closeModal()">Close</button>
+        <!-- Inventory -->
+        <div class="modal-section">
+            <div class="modal-section-title">📦 Inventory</div>
+            <div class="modal-row">
+                <span class="label">Order a stock crate</span>
+                <button class="btn btn-accent btn-sm" onclick="buyStock()">Buy $50</button>
             </div>
         </div>
-    </div>
 
-    <!-- Scratcher Modal Overlay -->
-    <div class="modal-overlay" id="scratcher-overlay" onclick="if(event.target===this)closeScratcher()">
-        <div class="modal-box" id="scratcher-modal" style="display:block; text-align:center;">
-            <div class="modal-title" style="justify-content:center">🎟 Lucky Scratcher</div>
-            <div id="scratch-container">
-                <div class="prize-grid" id="prize-grid">
-                    <div class="prize-cell">?</div><div class="prize-cell">?</div>
-                    <div class="prize-cell">?</div><div class="prize-cell">?</div>
-                </div>
-                <canvas id="scratch-canvas" width="280" height="280"></canvas>
+        <!-- Shop -->
+        <div class="modal-section">
+            <div class="modal-section-title">🏗 Shop</div>
+            <div class="modal-row">
+                <span class="label">Add a new shelf</span>
+                <button class="btn btn-primary btn-sm" onclick="addShelf()">Add $100</button>
             </div>
-            <p style="color:var(--muted); font-size:13px; margin:12px 0 16px;">Match 2 for $10 · Match 3 for $50</p>
-            <button class="btn btn-danger" onclick="closeScratcher()">Close</button>
+            <div class="modal-row" style="margin-top:6px">
+                <span class="label">Expand room downward</span>
+                <button class="btn btn-purple btn-sm" onclick="expandRoom()">Expand $300</button>
+            </div>
+        </div>
+
+        <!-- Staff -->
+        <div class="modal-section" id="staff-section">
+            <div class="modal-section-title">👷 Staff</div>
+            <div id="hire-row" class="modal-row">
+                <span class="label">Hire a worker</span>
+                <button class="btn btn-warning btn-sm" onclick="hireWorker()">Hire $200</button>
+            </div>
+            <div id="worker-tasks" style="display:none">
+                <div class="modal-row" style="margin-bottom:8px">
+                    <span class="label">Worker status:</span>
+                    <span class="value" id="worker-status-label">Idle</span>
+                </div>
+                <div class="worker-task-grid">
+                    <button class="task-btn" id="task-register" onclick="assignWorker('MANNING_REGISTER')">
+                        <span class="task-icon">🧾</span>Man Register
+                    </button>
+                    <button class="task-btn" id="task-stock" onclick="assignWorker('STOCKING')">
+                        <span class="task-icon">📦</span>Stock Shelves
+                    </button>
+                    <button class="task-btn" id="task-idle" onclick="assignWorker('IDLE')">
+                        <span class="task-icon">☕</span>Rest
+                    </button>
+                    <button class="task-btn" id="task-fire" onclick="fireWorker()" style="border-color:#ef4444;color:#ef4444">
+                        <span class="task-icon">🔥</span>Fire Worker
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Danger zone -->
+        <div style="display:flex; gap:8px">
+            <button class="btn btn-danger btn-sm" style="flex:1" onclick="resetGame()">⚠ Reset</button>
+            <button class="btn btn-surface btn-sm" style="flex:1" onclick="closeModal()">Close</button>
         </div>
     </div>
+</div>
+
+<!-- Scratcher Modal Overlay -->
+<div class="modal-overlay" id="scratcher-overlay" onclick="if(event.target===this)closeScratcher()">
+    <div class="modal-box" id="scratcher-modal" style="display:block; text-align:center;">
+        <div class="modal-title" style="justify-content:center">🎟 Lucky Scratcher</div>
+        <div id="scratch-container">
+            <div class="prize-grid" id="prize-grid">
+                <div class="prize-cell">?</div><div class="prize-cell">?</div>
+                <div class="prize-cell">?</div><div class="prize-cell">?</div>
+            </div>
+            <canvas id="scratch-canvas" width="280" height="280"></canvas>
+        </div>
+        <p style="color:var(--muted); font-size:13px; margin:12px 0 16px;">Match 2 for $10 · Match 3 for $50</p>
+        <button class="btn btn-danger" onclick="closeScratcher()">Close</button>
+    </div>
+</div>
+```
 
 <script src="camera.js"></script>
 
@@ -512,24 +518,30 @@ function updateCustomers(dt) {
     if (c.y > offY + 10) {
         c.state = 'TO_SHELF';
         c.queueTime = Date.now();
+        // Pick the best shelf: prefer one with stock, break ties randomly
+        const stocked = gameState.shelves.filter(s => s.stock > 0);
+        const pool = stocked.length > 0 ? stocked : gameState.shelves;
+        c.targetShelf = pool[Math.floor(Math.random() * pool.length)];
     }
 } 
         else if (c.state === 'TO_SHELF') {
-            const shelf = gameState.shelves[0];
-            // Get everyone currently in the shelf line
+            // Use the shelf assigned when they entered; fall back to first if missing (old save data)
+            const shelf = c.targetShelf || gameState.shelves[0];
+
+            // Queue only among customers going to the SAME shelf
             const shelfQueue = gameState.customers
-                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
-                .sort((a, b) => a.queueTime - b.queueTime); // Sort by who arrived first
+                .filter(cust => (cust.state === 'TO_SHELF' || cust.state === 'PICKING') && cust.targetShelf === shelf)
+                .sort((a, b) => a.queueTime - b.queueTime);
             
             const pos = shelfQueue.indexOf(c);
 
             // Target the floor tile in front of the shelf
-            c.tX = offX + (shelf.gridX - 0.8) * TILE; // customer distance to shelf
-            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35); // queue distance
+            c.tX = offX + (shelf.gridX - 0.8) * TILE;
+            c.tY = offY + (shelf.gridY + 1) * TILE + (pos * 35);
 
             const dist = Math.hypot(c.x - c.tX, c.y - c.tY);
             
-            // CRITICAL: Only index 0 can pick. This prevents cutting.
+            // CRITICAL: Only index 0 of this shelf's queue can pick
             if (pos === 0 && dist < 20) {
                 c.state = 'PICKING';
                 c.timer = 1.5;
@@ -538,7 +550,7 @@ function updateCustomers(dt) {
         else if (c.state === 'PICKING') {
             c.timer -= dt;
             if (c.timer <= 0) {
-                const s = gameState.shelves[0];
+                const s = c.targetShelf || gameState.shelves[0];
                 if (s.stock > 0) {
                     // Success: Customer finds tickets
                     const grab = Math.min(s.stock, Math.floor(Math.random() * 3) + 1);
@@ -1178,9 +1190,9 @@ function resize() {
             c.tX = (doorXStart + doorXEnd) / 2;
             c.tY = offY - 20;
         } else if (c.state === 'TO_SHELF' || c.state === 'PICKING') {
-            const shelf = gameState.shelves[0];
+            const shelf = c.targetShelf || gameState.shelves[0];
             const shelfQueue = gameState.customers
-                .filter(cust => cust.state === 'TO_SHELF' || cust.state === 'PICKING')
+                .filter(cust => (cust.state === 'TO_SHELF' || cust.state === 'PICKING') && cust.targetShelf === shelf)
                 .sort((a, b) => a.queueTime - b.queueTime);
             const pos = shelfQueue.indexOf(c);
             c.tX = offX + (shelf.gridX - 0.8) * TILE;
@@ -1434,11 +1446,26 @@ function updateWorker(dt) {
 
     // ── Task: Man Register ──
     if (w.task === 'MANNING_REGISTER') {
-        const regX = offX + (gameState.counter.gridX - 0.5) * TILE;
-        const regY = offY + (gameState.counter.gridY + 1) * TILE;
-        if (Math.hypot(w.x - regX, w.y - regY) > 20) {
-            w.tX = regX; w.tY = regY;
+        // Target the register zone tile — same tile the player uses (one left of counter, mid-height)
+        const regGX = gameState.counter.gridX - 1;
+        const regGY = gameState.counter.gridY + Math.floor(gameState.counter.h / 2);
+        const regX  = offX + (regGX + 0.5) * TILE;
+        const regY  = offY + (regGY + 0.5) * TILE;
+
+        // Only re-path when not already heading there and not already in zone
+        if (!w._regPathed && Math.hypot(w.x - regX, w.y - regY) > TILE * 0.8) {
+            const startGX = Math.floor((w.x - offX) / TILE);
+            const startGY = Math.floor((w.y - offY) / TILE);
+            const path = findPath(startGX, startGY, regGX, regGY);
+            if (path) { w.path = path; }
+            w._regPathed = true; // Don't re-path every frame
         }
+        // Reset pathed flag once we've arrived so we re-path if bumped away
+        if (Math.hypot(w.x - regX, w.y - regY) < TILE * 0.8) {
+            w._regPathed = false;
+        }
+    } else {
+        w._regPathed = false; // Reset when task changes
     }
 
     // ── Task: Stocking (state machine) ──
@@ -1782,5 +1809,6 @@ document.addEventListener("visibilitychange", () => {
 
 let spawnInterval = setInterval(() => { if (gameState.customers.length < 8) spawnCustomer(); }, 3500);
 </script>
+
 </body>
 </html>
